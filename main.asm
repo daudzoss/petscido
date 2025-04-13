@@ -22,11 +22,13 @@ symchar	.text	$80|$20		; 0: space, unoccupied spot in play area
 	.text	$80|$5b		; f=15: all directions inward
 
 rot90cw	.macro			;
-	and	#$0f		;inline uint8_t rot90cw(uint4_t a) { // nyb rot
-	clc			;
-	adc	#$f8		; return ((a & 7) << 1) | ((a & 8) ? 1 : 0);
-	rol			;
-	and	#$0f		;} // rot90cw()
+	and	#$0f		;inline uint8_t rot90cw(uint4_t a,
+-	clc			;                       uint2_t y) { // nyb rot
+	adc	#$f8		; do {
+	rol			;  a = ((a & 7) << 1) | ((a & 8) ? 1 : 0);
+	and	#$0f		; } while (--y);
+	dey			; return a;
+	bne	-		;} // rot90cw()
 	.endm			;
 	
 ;;;    2^1 2^3
@@ -109,30 +111,28 @@ loop3	sta	$0c01
 	bit	$76
 	bvc	loop4		; rot=10
 	
-	rot90cw
-	rot90cw
+	ldy	#$03
 	rot90cw
 	tay
 	lda	symchar,y
 	sta	$0c2a		; pivot point
 	lda	$76
 	outsym
-	rot90cw
-	rot90cw
+	ldy	#$03
 	rot90cw
 	tay
 	lda	symchar,y
 	sta	$0c02		; rot=11 is above
 	jmp	loop7
 		
-loop4	rot90cw
+loop4	ldy	#$02
 	rot90cw
 	tay
 	lda	symchar,y
 	sta	$0c2a		; pivot point
 	lda	$76
 	outsym
-	rot90cw
+	ldy	#$02
 	rot90cw
 	tay
 	lda	symchar,y
@@ -141,12 +141,14 @@ loop4	rot90cw
 	
 loop5	bit	$76
 	bvc	loop6		; rot=00
+	ldy	#$01
 	rot90cw
 	tay
 	lda	symchar,y
 	sta	$0c2a		; pivot point
 	lda	$76
 	outsym
+	ldy	#$01
 	rot90cw
 	tay
 	lda	symchar,y
@@ -200,7 +202,7 @@ loop9	lda	$76
 	and	#$3f
 	beq	+
 	jmp	loop
-	lda	#$3f
++	lda	#$3f
 	jmp	loop
 
 loopa	lda	$76
