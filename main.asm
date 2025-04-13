@@ -1,5 +1,11 @@
 	torch = $51
 	
+*	= $1001
+	.word	(+), 2055
+	.null	$9e, format("%4d", start)
++	.word 0
+start	jmp	main
+	
 ;;;    2^3
 ;;; 2^2   2^0
 ;;;    2^1
@@ -63,15 +69,12 @@ outsym	.macro			;static uint4_t outsyma = {1,12,6,14,5,13,7,15};
 	lsr			;inline uint4_t outsym(uint6_t a) {
 	lsr			;
 	lsr			;
-	tay			; return outsym[a >> 3];
+	and	#$07		;
+	tay			; return outsym[(a & 0x38) >> 3];
 	lda	outsyma,y	;}
 	.endm
 
-*	= $1001
-	.word	(+), 2055
-	.null	$9e, format("%4d", start)
-+	.word 0
-start	lda	#$93
+main	lda	#$93
 	jsr	$ffd2
 	lda	#$0		; black
 	sta	$0800		; 16's digit
@@ -91,8 +94,8 @@ loop	sta	$76
 	ora	#$30
 	cmp	#$3a
 	bcc	loop2
-	clc
-	adc	#$06
+	sec
+	sbc	#$39
 
 loop2	sta	$0c00
 	lda	$76
@@ -100,15 +103,14 @@ loop2	sta	$0c00
 	ora	#$30
 	cmp	#$3a
 	bcc	loop3
-	clc
-	adc	#$06
+	sec
+	sbc	#$39
 	
 loop3	sta	$0c01
 	lda	$76
 	innsym
 	bit	$76
 	bpl	loop5		; rot=00 or 01
-	bit	$76
 	bvc	loop4		; rot=10
 	
 	ldy	#$03
@@ -139,7 +141,7 @@ loop4	ldy	#$02
 	sta	$0c29		; rot=10 is left
 	jmp	loop7
 	
-loop5	bit	$76
+loop5	;bit	$76
 	bvc	loop6		; rot=00
 	ldy	#$01
 	rot90cw
@@ -155,7 +157,8 @@ loop5	bit	$76
 	sta	$0c52		; rot=01 is below
 	jmp	loop7
 
-loop6	tay
+loop6	and	#$0f
+	tay
 	lda	symchar,y
 	sta	$0c2a		; pivot point
 	lda	$76
