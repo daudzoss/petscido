@@ -1,4 +1,3 @@
-	torch = $51
 	
 *	= $1001
 	.word	(+), 2055
@@ -10,10 +9,11 @@ start	jmp	main
 ;;; 2^2   2^0
 ;;;    2^1
 ;;; upper 4 msb are masked off once that entry/exit connects to adjacent symbol
+	torch = $51
 symchar	.text	$80|$20		; 0: space, unoccupied spot in play area
 	.text	$80|torch	; 1: circle dead end, closes off escape
 	.text	$80|torch	; 2: circle dead end, closes off escape (n/a)
-	.text	$80|$4a		; 3: right bending downward
+	.text	$80|$55		; 3: right bending downward
 	.text	$80|torch	; 4: circle dead end, closes off escape (n/a)
 	.text	$80|$40		; 5: right straight leftward
 	.text	$80|$49		; 6: down bending leftward
@@ -74,6 +74,7 @@ outsym	.macro			;static uint4_t outsyma = {1,12,6,14,5,13,7,15};
 	lda	outsyma,y	;}
 	.endm
 
+.if TESTSYM	
 main	lda	#$93
 	jsr	$ffd2
 	lda	#$0		; black
@@ -169,10 +170,6 @@ loop6	and	#$0f
 
 loop7	jsr	$ffe4
 	beq	loop7
-	cmp	#$91
-	beq	loop8		; crsr up = increase tile# (wrap at 64)
-	cmp	#$11
-	beq	loop9		; crsr dn = decrease tile# (wrap at 0)
 
 	ldy	#$20
 	sty	$0c02		; outer if rot=11
@@ -181,6 +178,10 @@ loop7	jsr	$ffe4
 	sty	$0c2b		; outer if rot=00
 	sty	$0c52		; outer if rot=01
 
+	cmp	#$91
+	beq	loop8		; crsr up = increase tile# (wrap at 64)
+	cmp	#$11
+	beq	loop9		; crsr dn = decrease tile# (wrap at 0)
 	cmp	#$9d
 	beq	loopa		; crsr left = rotate ccw
 	cmp	#$1d
@@ -217,4 +218,4 @@ loopb	lda	$76
 	clc
 	adc	#$40
 	jmp	loop
-
+.endif
