@@ -75,8 +75,13 @@ outsym	.macro			;static uint4_t outsyma = {1,12,6,14,5,13,7,15};
 	.endm
 
 .if TESTSYM	
-main	lda	#$93		;void main(void) {
-	jsr	$ffd2		; putchar(0x93); // clear screen
+main	lda	#$13		;void main(void) {
+	jsr	$ffd2		; putchar(0x13); // go to screen home
+	ldy	#SCREENW*2+2	;
+	lda	#$20		; for (uint8_t y = SCREEN*2+2; y; y--)
+-	jsr	$ffd2		;  putchar(' '); // for VIC20 (instead of CLR)
+	dey			;
+	bne	-		;
 .if SCREENC
 	lda	#$0		; // set black foreground for all characters:
 	sta	SCREENC		; *((void*) SCREENC) = 0;// 16's digit of tile#
@@ -89,7 +94,7 @@ main	lda	#$93		;void main(void) {
 .endif
 	lda	#$01		; uint8_t zp = 1;
 	
-loop	sta	$76		; do {
+loop	sta	ZP		; do {
 	lsr			;  uint8_t a;
 	lsr			;
 	lsr			;
@@ -101,7 +106,7 @@ loop	sta	$76		; do {
 	sbc	#$39		;   a -= '9'; // hex-digit screen codes are 1-6
 
 loop2	sta	SCREENM		;  *((void*) (1024+2048)) = a; // 16's digit
-	lda	$76		;
+	lda	ZP		;
 	and	#$0f		;
 	ora	#$30		;  a = '0' | (zp & 0x0f);
 	cmp	#$3a		;
@@ -110,9 +115,9 @@ loop2	sta	SCREENM		;  *((void*) (1024+2048)) = a; // 16's digit
 	sbc	#$39		;   a -= '9';
 	
 loop3	sta	SCREENM+$1	;  *((void*) (1024+2049)) = a; // 1's digit
-	lda	$76		;
+	lda	ZP		;
 	innsym			;  a = innsym(zp);
-	bit	$76		;  switch (a >> 6) {
+	bit	ZP		;  switch (a >> 6) {
 	bpl	loop5		;
 	bvc	loop4		;
 	
@@ -121,7 +126,7 @@ loop3	sta	SCREENM+$1	;  *((void*) (1024+2049)) = a; // 1's digit
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta SCREENM+SCREENW+2	;   *((void*) 1024+2090 = a; // pivot point
-	lda	$76		;
+	lda	ZP		;
 	outsym			;   a = outsym(zp);
 	ldy	#$03		;
 	rot90cw			;   a = rot90cw(a, 3);
@@ -135,7 +140,7 @@ loop4	ldy	#$02		;  case 2: // 180 degrees clockwise (leftward)
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta SCREENM+SCREENW+2	;   *((void*) 1024+2090 = a; // pivot point
-	lda	$76		;
+	lda	ZP		;
 	outsym			;   a = outsym(zp);
 	ldy	#$02		;
 	rot90cw			;   a = rot90cw(a, 2);
@@ -150,7 +155,7 @@ loop5	bvc	loop6		;
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta SCREENM+SCREENW+2	;   *((void*) 1024+2090 = a; // pivot point
-	lda	$76		;
+	lda	ZP		;
 	outsym			;   a = outsym(zp);
 	ldy	#$01		;
 	rot90cw			;   a = rot90cw(a, 1);
@@ -163,7 +168,7 @@ loop6	and	#$0f		;  case 0: default: // unrotated (rightward)
 	tay			;
 	lda	symchar,y	;   a = symchar[a & 0x0f];
 	sta SCREENM+SCREENW+2		;   *((void*) 1024+2090 = a; // pivot point
-	lda	$76		;
+	lda	ZP		;
 	outsym			;   a = outsym(zp);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
@@ -191,7 +196,7 @@ loop7	jsr	$ffe4		;  }
 	bne	loop7		;  case 'Q':
 	rts			;   return;
 
-loop8	lda	$76		;  case 0x91:
+loop8	lda	ZP		;  case 0x91:
 	clc			;
 	adc	#$1		;
 	and	#$3f		;   a = (a + 1) & 0x3f; // next highest tile#
@@ -200,7 +205,7 @@ loop8	lda	$76		;  case 0x91:
 +	lda	#$01		;    a = 1; // 0 is a non-tile
 	jmp	loop		;   break;
 
-loop9	lda	$76		;  case 0x11:
+loop9	lda	ZP		;  case 0x11:
 	sec			;
 	sbc	#$1		;
 	and	#$3f		;   a = (a - 1) & 0x3f; // next highest tile#
@@ -209,12 +214,12 @@ loop9	lda	$76		;  case 0x11:
 +	lda	#$3f		;    a = 63; // 63 is 6-path tile (not in game)
 	jmp	loop		;   break;
 
-loopa	lda	$76		;  case 0x9d:
+loopa	lda	ZP		;  case 0x9d:
 	sec			;
 	sbc	#$40		;   a -= 0x40; // cycle msb through 00,11,10,01
 	jmp	loop		;   break;
 	
-loopb	lda	$76		;  case 0x1d:
+loopb	lda	ZP		;  case 0x1d:
 	clc			;   a += 0x40; // cycle msb through 00,01,10,11
 	adc	#$40		;   break;
 	jmp	loop		; } while (1);
