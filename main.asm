@@ -40,7 +40,7 @@ rot90cw	.macro			;
 ;;;    2^1 2^3
 ;;; 2^0       2^5
 ;;;    2^2 2^4
-;;; upper 2 msb are used for (clockwise!) rotation angle
+;;; upper 2 msb are used for (clockwise) rotation angle
 innsyma	.text	$1		; 0: 
 	.text	$5		; 1: enters from left, closed off
 	.text	$9		; 2: enters from top left, closed off
@@ -75,147 +75,147 @@ outsym	.macro			;static uint4_t outsyma = {1,12,6,14,5,13,7,15};
 	.endm
 
 .if TESTSYM	
-main	lda	#$93
-	jsr	$ffd2
-	lda	#$0		; black
-	sta	$0800		; 16's digit
-	sta	$0801		; 1's digit
-	sta	$0802		; outer if rot=11
-	sta	$0829		; outer if rot=10
-	sta	$082a		; inner (pivot point)
-	sta	$082b		; outer if rot=00
-	sta	$0852		; outer if rot=01
-	lda	#$01
-	
-loop	sta	$76
-	lsr
-	lsr
-	lsr
-	lsr
-	ora	#$30
-	cmp	#$3a
-	bcc	loop2
-	sec
-	sbc	#$39
-
-loop2	sta	$0c00
-	lda	$76
-	and	#$0f
-	ora	#$30
-	cmp	#$3a
-	bcc	loop3
-	sec
-	sbc	#$39
-	
-loop3	sta	$0c01
-	lda	$76
-	innsym
-	bit	$76
-	bpl	loop5		; rot=00 or 01
-	bvc	loop4		; rot=10
-	
-	ldy	#$03
-	rot90cw
-	tay
-	lda	symchar,y
-	sta	$0c2a		; pivot point
-	lda	$76
-	outsym
-	ldy	#$03
-	rot90cw
-	tay
-	lda	symchar,y
-	sta	$0c02		; rot=11 is above
-	jmp	loop7
-		
-loop4	ldy	#$02
-	rot90cw
-	tay
-	lda	symchar,y
-	sta	$0c2a		; pivot point
-	lda	$76
-	outsym
-	ldy	#$02
-	rot90cw
-	tay
-	lda	symchar,y
-	sta	$0c29		; rot=10 is left
-	jmp	loop7
-	
-loop5	;bit	$76
-	bvc	loop6		; rot=00
-	ldy	#$01
-	rot90cw
-	tay
-	lda	symchar,y
-	sta	$0c2a		; pivot point
-	lda	$76
-	outsym
-	ldy	#$01
-	rot90cw
-	tay
-	lda	symchar,y
-	sta	$0c52		; rot=01 is below
-	jmp	loop7
-
-loop6	and	#$0f
-	tay
-	lda	symchar,y
-	sta	$0c2a		; pivot point
-	lda	$76
-	outsym
-	tay
-	lda	symchar,y
-	sta	$0c2b		; rot=00 is right
-
-loop7	jsr	$ffe4
-	beq	loop7
-
-	ldy	#$20
-	sty	$0c02		; outer if rot=11
-	sty	$0c29		; outer if rot=10
-	sty	$0c2a		; inner (pivot point)
-	sty	$0c2b		; outer if rot=00
-	sty	$0c52		; outer if rot=01
-
-	cmp	#$91
-	beq	loop8		; crsr up = increase tile# (wrap at 64)
-	cmp	#$11
-	beq	loop9		; crsr dn = decrease tile# (wrap at 0)
-	cmp	#$9d
-	beq	loopa		; crsr left = rotate ccw
-	cmp	#$1d
-	beq	loopb		; crsr right = rotate cw
-	and	#$6f
-	cmp	#$51		; q = done
-	bne	loop7
-	rts
-
-loop8	lda	$76
-	clc
-	adc	#$1
-	and	#$3f
-	beq	+
-	jmp	loop
-+	lda	#$01
-	jmp	loop
-
-loop9	lda	$76
-	sec
-	sbc	#$1
-	and	#$3f
-	beq	+
-	jmp	loop
-+	lda	#$3f
-	jmp	loop
-
-loopa	lda	$76
-	sec
-	sbc	#$40
-	jmp	loop
-	
-loopb	lda	$76
-	clc
-	adc	#$40
-	jmp	loop
+main	lda	#$93		;void main(void) {
+	jsr	$ffd2		; putchar(0x93); // clear screen
+.if SCREENC
+	lda	#$0		; // set black foreground for all characters:
+	sta	SCREENC		; *((void*) SCREENC) = 0;// 16's digit of tile#
+	sta	SCREENC+$1	; *((void*) SCREENC+1) = 0;// 1's digit of tile#
+	sta	SCREENC+$2	; *((void*) SCREENC+42-40) = 0;// outer if rot=3
+	sta SCREENC+SCREENW+2-1	; *((void*) SCREENC+42-1) = 0;// outer if rot=2
+	sta SCREENC+SCREENW+2	; *((void*) SCREENC+42) = 0;// inner=pivot point
+	sta SCREENC+SCREENW+2+1	; *((void*) SCREENC+42+1) = 0;// outer if rot=0
+	sta SCREENC+2*SCREENW+2	; *((void*) SCREENC+42+40) = 0;// outer if rot=1
 .endif
+	lda	#$01		; uint8_t zp = 1;
+	
+loop	sta	$76		; do {
+	lsr			;  uint8_t a;
+	lsr			;
+	lsr			;
+	lsr			;
+	ora	#$30		;  a = '0' | (zp >> 4);
+	cmp	#$3a		;
+	bcc	loop2		;  if (a > '9')
+	sec			;
+	sbc	#$39		;   a -= '9'; // hex-digit screen codes are 1-6
+
+loop2	sta	SCREENM		;  *((void*) (1024+2048)) = a; // 16's digit
+	lda	$76		;
+	and	#$0f		;
+	ora	#$30		;  a = '0' | (zp & 0x0f);
+	cmp	#$3a		;
+	bcc	loop3		;  if (a > '9')
+	sec			;
+	sbc	#$39		;   a -= '9';
+	
+loop3	sta	SCREENM+$1	;  *((void*) (1024+2049)) = a; // 1's digit
+	lda	$76		;
+	innsym			;  a = innsym(zp);
+	bit	$76		;  switch (a >> 6) {
+	bpl	loop5		;
+	bvc	loop4		;
+	
+	ldy	#$03		;  case 3: // 270 degrees clockwise (upward)
+	rot90cw			;   a = rot90cw(a, 3);
+	tay			;
+	lda	symchar,y	;   a = symchar[a];
+	sta SCREENM+SCREENW+2	;   *((void*) 1024+2090 = a; // pivot point
+	lda	$76		;
+	outsym			;   a = outsym(zp);
+	ldy	#$03		;
+	rot90cw			;   a = rot90cw(a, 3);
+	tay			;
+	lda	symchar,y	;   a = symchar[a];
+	sta	SCREENM+$2	;   *((void*) (1024+2090-40)) = a;
+	jmp	loop7		;   break;
+		
+loop4	ldy	#$02		;  case 2: // 180 degrees clockwise (leftward)
+	rot90cw			;   a = rot90cw(a, 2);
+	tay			;
+	lda	symchar,y	;   a = symchar[a];
+	sta SCREENM+SCREENW+2	;   *((void*) 1024+2090 = a; // pivot point
+	lda	$76		;
+	outsym			;   a = outsym(zp);
+	ldy	#$02		;
+	rot90cw			;   a = rot90cw(a, 2);
+	tay			;
+	lda	symchar,y	;   a = symchar[a];
+	sta SCREENM+SCREENW+2-1	;   *((void*) (1024+2090-1)) = a;
+	jmp	loop7		;   break;
+	
+loop5	bvc	loop6		;
+	ldy	#$01		;  case 1: // 90 degrees clockwise (downward)
+	rot90cw			;   a = rot90cw(a, 1);
+	tay			;
+	lda	symchar,y	;   a = symchar[a];
+	sta SCREENM+SCREENW+2	;   *((void*) 1024+2090 = a; // pivot point
+	lda	$76		;
+	outsym			;   a = outsym(zp);
+	ldy	#$01		;
+	rot90cw			;   a = rot90cw(a, 1);
+	tay			;
+	lda	symchar,y	;   a = symchar[a];
+	sta SCREENM+2*SCREENW+2	;   *((void*) (1024+2090+40)) = a;
+	jmp	loop7		;   break;
+
+loop6	and	#$0f		;  case 0: default: // unrotated (rightward)
+	tay			;
+	lda	symchar,y	;   a = symchar[a & 0x0f];
+	sta SCREENM+SCREENW+2		;   *((void*) 1024+2090 = a; // pivot point
+	lda	$76		;
+	outsym			;   a = outsym(zp);
+	tay			;
+	lda	symchar,y	;   a = symchar[a];
+	sta SCREENM+SCREENW+2+1	;   *((void*) (1024+2090+1)) = a;
+
+loop7	jsr	$ffe4		;  }
+	beq	loop7		;  do {} while ((a = getchar()) == 0);
+	ldy	#$20		;  // erase prior to a possible rotation/change
+	sty	SCREENM+2	;  *((void*) (1024+2090-40)) = ' ';
+	sty SCREENM+SCREENW+2-1	;  *((void*) (1024+2090-1)) = ' ';
+	sty SCREENM+SCREENW+2	;  *((void*) (1024+2090)) = ' ';
+	sty SCREENM+SCREENW+2+1	;  *((void*) (1024+2090+1)) = ' ';
+	sty SCREENM+2*SCREENW+2	;  *((void*) (1024+2090+40)) = ' ';
+
+	cmp	#$91		;  // crsr up $91 = increase tile# (wrap at 64)
+	beq	loop8		;
+	cmp	#$11		;  // crsr dn $11 = decrease tile# (wrap at 0)
+	beq	loop9		; 
+	cmp	#$9d		;  // crsr left $9d = rotate ccw
+	beq	loopa		;
+	cmp	#$1d		;  // crsr right $1d = rotate cw
+	beq	loopb		;
+	and	#$6f		;  switch (a) {
+	cmp	#$51		;  case 'q':
+	bne	loop7		;  case 'Q':
+	rts			;   return;
+
+loop8	lda	$76		;  case 0x91:
+	clc			;
+	adc	#$1		;
+	and	#$3f		;   a = (a + 1) & 0x3f; // next highest tile#
+	beq	+		;
+	jmp	loop		;   if (a == 0)
++	lda	#$01		;    a = 1; // 0 is a non-tile
+	jmp	loop		;   break;
+
+loop9	lda	$76		;  case 0x11:
+	sec			;
+	sbc	#$1		;
+	and	#$3f		;   a = (a - 1) & 0x3f; // next highest tile#
+	beq	+		;
+	jmp	loop		;   if (a == 0)
++	lda	#$3f		;    a = 63; // 63 is 6-path tile (not in game)
+	jmp	loop		;   break;
+
+loopa	lda	$76		;  case 0x9d:
+	sec			;
+	sbc	#$40		;   a -= 0x40; // cycle msb through 00,11,10,01
+	jmp	loop		;   break;
+	
+loopb	lda	$76		;  case 0x1d:
+	clc			;   a += 0x40; // cycle msb through 00,01,10,11
+	adc	#$40		;   break;
+	jmp	loop		; } while (1);
+.endif				;} // main(TESTSYM)
