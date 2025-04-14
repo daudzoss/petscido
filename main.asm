@@ -5,6 +5,31 @@
 +	.word 0
 start	jmp	main
 	
+FIELDSZ	= 1<<(2*FIELDPW)	;
+FIELDMX = field+FIELDSZ-1	; last byte of FIELDSZ-aligned region 'field'
+	
+INITILE	= $3e			; start with five rightmost paths open
+XHAIRPV	= SCREENW*SCREENH/2	; character to the right of screen center
+XHAIRLT	= XHAIRPV-1		; character to the left of scren center
+XHAIRRT	= XHAIRPV+1		; the initial unplaced tile position, w/ XHAIRPV
+XHAIRUP = XHAIRPV-SCREENW	;
+XHAIRDN	= XHAIRPV+SCREENW	;
+	
+XFLDOFS	= ZP			; static uint8_t XFLDOFS;
+YFLDOFS	= ZP+1			; static uint8_t YFLDOFS;
+POINTRA = ZP+2			; static uint8_t* POINTRA;
+POINTRB = ZP+4			; static uint8_t* POINTRB;
+
+CURTILE	.byte	$32;arbitrary	; static uint8_t CURTILE = 0x32;
+PBACKUP	.byte	$20		; static uint8_t PBACKUP = ' ';
+LBACKUP	.byte	$20		; static uint8_t LBACKUP = ' ';
+RBACKUP .byte	$20		; static uint8_t RBACKUP = ' ';
+UBACKUP	.byte	$20		; static uint8_t UBACKUP = ' ';
+DBACKUP	.byte	$20		; static uint8_t DBACKUP = ' ';
+	
+FIELDC	.byte	$0		; black
+XHAIRC	.byte	$2		; orange
+	
 ;;;    2^3
 ;;; 2^2   2^0
 ;;;    2^1
@@ -41,6 +66,7 @@ rot90cw	.macro			;
 ;;; 2^0       2^5
 ;;;    2^2 2^4
 ;;; upper 2 msb are used for (clockwise) rotation angle
+	
 innsyma	.text	$1		; 0: 
 	.text	$5		; 1: enters from left, closed off
 	.text	$9		; 2: enters from top left, closed off
@@ -226,12 +252,173 @@ loopb	lda	ZP		;  case 0x1d:
 .endif				;} // main(TESTSYM)
 
 .if TESTFLD
+main	lda	#$93		;
+	jsr	$ffd2		;
+
+	lda	# <FIELDMX	;
+	sta	selfmod+1	;
+	lda	# >FIELDMX	;
+	sta	selfmod+2	;
+	lda	#$20		;
+selfmod	sta	FIELDMX		;
+	dec	selfmod+1	;
+	bne	selfmod		;
+	dec	selfmod+2	;
+	ldy	selfmod+2	;
+	cpy	# >field	;
+	bcs	selfmod		;
+
+	lda	#1<<(FIELDPW-1)	;
+	sta	XFLDOFS		;
+	sta	YFLDOFS		;
 	
+loop1	lda	SCREENM+XHAIRPV	;
+	sta	PBACKUP		;
+	lda	SCREENM+XHAIRLT	;
+	sta	LBACKUP		;
+	lda	SCREENM+XHAIRRT	;
+	sta	RBACKUP		;
+	lda	SCREENM+XHAIRUP	;
+	sta	UBACKUP		;
+	lda	SCREENM+XHAIRDN	;
+	sta	DBACKUP		;
+
+	lda	XHAIRC		;
+	sta	SCREENC+XHAIRPV	;
+	lda	CURTILE		;
+	
+loop2	bit	CURTILE		; // perform the rotation
+	bpl	loopb		;
+	bvc	loopa		;
+	lda	UBACKUP		;
+	sta	SCREENM+XHAIRUP	;
+	lda	FIELDC		;
+	sta	SCREENC+XHAIRUP	;
+	lda	XHAIRC		;
+	sta	SCREENC+XHAIRRT	;
+	jmp	loopd		;
+loopa	lda	LBACKUP		;
+	sta	SCREENM+XHAIRLT	;
+	lda	FIELDC		;
+	sta	SCREENC+XHAIRLT	;
+	lda	XHAIRC		;
+	sta	SCREENC+XHAIRDN	;
+	jmp	loopd		;
+loopb	bvc	loopc		;
+	lda	DBACKUP		;
+	sta	SCREENM+XHAIRDN	;
+	lda	FIELDC		;
+	sta	SCREENC+XHAIRDN	;
+	lda	XHAIRC		;
+	sta	SCREENC+XHAIRLT	;
+	jmp	loopd		;
+loopc	lda	RBACKUP		;
+	sta	SCREENM+XHAIRRT	;
+	lda	FIELDC		;
+	sta	SCREENC+XHAIRRT	;
+	lda	XHAIRC		;
+	sta	SCREENC+XHAIRDN	;
+loopd	lda	CURTILE		;
+	clc			;
+	adc	#$40		;
+	sta	CURTILE		;
+
+loop3	lda	CURTILE		;  // depict the rotation
+	innsym			;  a = innsym(zp);
+	bit	CURTILE		;  switch (a >> 6) {
+	bpl	loop5		;
+	bvc	loop4		;
+	
+	ldy	#$03		;  case 3: // 270 degrees clockwise (upward)
+	rot90cw			;   a = rot90cw(a, 3);
+	tay			;
+	lda	symchar,y	;   a = symchar[a];
+	sta 	SCREENM+XHAIRPV	;   *((void*) 1024+2090 = a; // pivot point
+	lda	CURTILE		;
+	outsym			;   a = outsym(zp);
+	ldy	#$03		;
+	rot90cw			;   a = rot90cw(a, 3);
+	tay			;
+	lda	symchar,y	;   a = symchar[a];
+	sta	SCREENM+XHAIRUP	;   *((void*) (1024+2090-40)) = a;
+	jmp	loop7		;   break;
+		
+loop4	ldy	#$02		;  case 2: // 180 degrees clockwise (leftward)
+	rot90cw			;   a = rot90cw(a, 2);
+	tay			;
+	lda	symchar,y	;   a = symchar[a];
+	sta 	SCREENM+XHAIRPV	;   *((void*) 1024+2090 = a; // pivot point
+	lda	CURTILE		;
+	outsym			;   a = outsym(zp);
+	ldy	#$02		;
+	rot90cw			;   a = rot90cw(a, 2);
+	tay			;
+	lda	symchar,y	;   a = symchar[a];
+	sta 	SCREENM+XHAIRLT	;   *((void*) (1024+2090-1)) = a;
+	jmp	loop7		;   break;
+	
+loop5	bvc	loop6		;
+	ldy	#$01		;  case 1: // 90 degrees clockwise (downward)
+	rot90cw			;   a = rot90cw(a, 1);
+	tay			;
+	lda	symchar,y	;   a = symchar[a];
+	sta 	SCREENM+XHAIRPV	;   *((void*) 1024+2090 = a; // pivot point
+	lda	CURTILE		;
+	outsym			;   a = outsym(zp);
+	ldy	#$01		;
+	rot90cw			;   a = rot90cw(a, 1);
+	tay			;
+	lda	symchar,y	;   a = symchar[a];
+	sta 	SCREENM+XHAIRDN	;   *((void*) (1024+2090+40)) = a;
+	jmp	loop7		;   break;
+
+loop6	and	#$0f		;  case 0: default: // unrotated (rightward)
+	tay			;
+	lda	symchar,y	;   a = symchar[a & 0x0f];
+	sta	SCREENM+XHAIRPV	;   *((void*) 1024+2090 = a; // pivot point
+	lda	CURTILE		;
+	outsym			;   a = outsym(zp);
+	tay			;
+	lda	symchar,y	;   a = symchar[a];
+	sta	SCREENM+XHAIRRT	;   *((void*) (1024+2090+1)) = a;
+
+loop7	jsr	$ffe4		;  }
+	beq	loop7		;  do {} while ((a = getchar()) == 0);
+
+	cmp	#$91		;
+	beq	loop8		;
+	cmp	#$11		;
+	beq	loop8		;
+	cmp	#$9d		;
+	beq	loop8		;
+	cmp	#$1d		;
+	beq 	loop8		;
+	
+	cmp	#$20		;  if (a == ' ')
+	bne	loopq		;
+	jmp	loop2		;   continue;
+
+loopq	and	#$5f		;
+	cmp	#$51		;
+	bne	loop7		;  else if (a == 'q' || a == 'Q')
+	rts			;   return;
+	
+loop8	jmp	loop7 ;for now
 .endif	
 
+
+
+
+
+
+
+
+
+
+	.align	FIELDSZ
 field
-	.align	1<<(2*FIELDPW)	; necessary?
-	.fill	1<<(2*FIELDPW)
+  	.fill	FIELDSZ
 .if 0
 	brk
 .endif	
+
