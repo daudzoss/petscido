@@ -191,7 +191,7 @@ loop7	jsr	$ffe4		;  }
 	beq	loopa		;
 	cmp	#$1d		;  // crsr right $1d = rotate cw
 	beq	loopb		;
-	and	#$6f		;  switch (a) {
+	and	#$5f		;  switch (a) {
 	cmp	#$51		;  case 'q':
 	bne	loop7		;  case 'Q':
 	rts			;   return;
@@ -232,5 +232,6 @@ loopb	lda	ZP		;  case 0x1d:
 field
 	.align	1<<(2*FIELDPW)	; necessary?
 	.fill	1<<(2*FIELDPW)
+.if 0
 	brk
-	
+.endif	
