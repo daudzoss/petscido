@@ -224,3 +224,13 @@ loopb	lda	ZP		;  case 0x1d:
 	adc	#$40		;   break;
 	jmp	loop		; } while (1);
 .endif				;} // main(TESTSYM)
+
+.if TESTFLD
+	
+.endif	
+
+field
+	.align	1<<(2*FIELDPW)	; necessary?
+	.fill	1<<(2*FIELDPW)
+	brk
+	
