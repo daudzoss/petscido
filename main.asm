@@ -1,5 +1,5 @@
 	
-*	= $1001
+*	= BASIC+1
 	.word	(+), 2055
 	.null	$9e, format("%4d", start)
 +	.word 0
@@ -272,6 +272,11 @@ selfmod	sta	FIELDMX		;
 	sta	XFLDOFS		;
 	sta	YFLDOFS		;
 	
+loop	lda	RNDLOC1		;
+	eor	RNDLOC2		;
+	and	#$3f		;
+	sta	CURTILE		;
+
 loop1	lda	SCREENM+XHAIRPV	;
 	sta	PBACKUP		;
 	lda	SCREENM+XHAIRLT	;
@@ -302,7 +307,7 @@ loopa	lda	LBACKUP		;
 	lda	FIELDC		;
 	sta	SCREENC+XHAIRLT	;
 	lda	XHAIRC		;
-	sta	SCREENC+XHAIRDN	;
+	sta	SCREENC+XHAIRUP	;
 	jmp	loopd		;
 loopb	bvc	loopc		;
 	lda	DBACKUP		;
