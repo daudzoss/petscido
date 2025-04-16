@@ -58,15 +58,27 @@ symchar	.text	$80|$20		; 0: space, unoccupied spot in play area
  	.text	$80|$73		; e=14: up straight downward teed leftward
 	.text	$80|$5b		; f=15: all directions inward
 
-rot90cw	.macro			;
+ex = 1
+ey = 2
+rot90cw	.macro	decrement=0
 	and	#$0f		;inline uint8_t rot90cw(uint4_t a,
+.if \decrement
 -	clc			;                       uint2_t y) { // nyb rot
+.else
+	clc			;
+.endif
 	adc	#$f8		; do {
 	rol			;  a = ((a & 7) << 1) | ((a & 8) ? 1 : 0);
 	and	#$0f		; } while (--y);
-	\1			; return a;
-	bne	-		;} // rot90cw()
-	.endm			;
+.if \decrement
+	.if \decrement-1
+	 dey
+	.else
+	 dex
+	.endif
+	bne	-		; return a;
+.endif
+	.endm			;} // rot90cw()
 	
 ;;;    2^1 2^3
 ;;; 2^0       2^5
@@ -169,43 +181,41 @@ loop3	sta	SCREENM+$1	;  *((void*) (1024+2049)) = a; // 1's digit
 	bvc	loop4		;
 	
 	ldy	#$03		;  case 3: // 270 degrees clockwise (upward)
-	rot90cw	dey		;   a = rot90cw(a, 3);
+	rot90cw	ey		;   a = rot90cw(a, 3);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta SCREENM+SCREENW+2	;   *((void*) 1024+2090 = a; // pivot point
 	lda	ZP		;
 	outsym			;   a = outsym(zp);
 	ldy	#$03		;
-	rot90cw	dey		;   a = rot90cw(a, 3);
+	rot90cw	ey		;   a = rot90cw(a, 3);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta	SCREENM+$2	;   *((void*) (1024+2090-40)) = a;
 	jmp	loop7		;   break;
 		
 loop4	ldy	#$02		;  case 2: // 180 degrees clockwise (leftward)
-	rot90cw	dey		;   a = rot90cw(a, 2);
+	rot90cw	ey		;   a = rot90cw(a, 2);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta SCREENM+SCREENW+2	;   *((void*) 1024+2090 = a; // pivot point
 	lda	ZP		;
 	outsym			;   a = outsym(zp);
 	ldy	#$02		;
-	rot90cw	dey		;   a = rot90cw(a, 2);
+	rot90cw	ey		;   a = rot90cw(a, 2);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta SCREENM+SCREENW+2-1	;   *((void*) (1024+2090-1)) = a;
 	jmp	loop7		;   break;
 	
-loop5	bvc	loop6		;
-	ldy	#$01		;  case 1: // 90 degrees clockwise (downward)
-	rot90cw	dey		;   a = rot90cw(a, 1);
+loop5	bvc	loop6		;  case 1: // 90 degrees clockwise (downward)
+	rot90cw			;   a = rot90cw(a, 1);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta SCREENM+SCREENW+2	;   *((void*) 1024+2090 = a; // pivot point
 	lda	ZP		;
 	outsym			;   a = outsym(zp);
-	ldy	#$01		;
-	rot90cw	dey		;   a = rot90cw(a, 1);
+	rot90cw			;   a = rot90cw(a, 1);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta SCREENM+2*SCREENW+2	;   *((void*) (1024+2090+40)) = a;
@@ -378,51 +388,48 @@ loopd	lda	CURTILE		; }
 	clc			;
 	adc	#$40		;
 	sta	CURTILE		; CURTILE += (1 << 6);
-
-loop3	lda	CURTILE		;  // depict the rotation
-	innsym			;  a = innsym(CURTILE);
-	bit	CURTILE		;  switch (CURTILE >> 6) {
-	bpl	loop5		;
+	
+	innsym			;  // depict the rotation
+	bit	CURTILE		;  a = innsym(CURTILE);
+	bpl	loop5		;  switch (CURTILE >> 6) {
 	bvc	loop4		;
 	
 	ldy	#$03		;  case 3: // 270 degrees clockwise (upward)
-	rot90cw	dey		;   a = rot90cw(a, 3);
+	rot90cw	ey		;   a = rot90cw(a, 3);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta 	SCREENM+XHAIRPV	;   SCREENM[XHAIRPV] = a; // pivot point
 	lda	CURTILE		;
 	outsym			;   a = outsym(CURTILE);
 	ldy	#$03		;
-	rot90cw	dey		;   a = rot90cw(a, 3);
+	rot90cw	ey		;   a = rot90cw(a, 3);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta	SCREENM+XHAIRUP	;   SCREENM[XHAIRUP] = a;
 	jmp	loop7		;   break;
 
 loop4	ldy	#$02		;  case 2: // 180 degrees clockwise (leftward)
-	rot90cw	dey		;   a = rot90cw(a, 2);
+	rot90cw	ey		;   a = rot90cw(a, 2);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta 	SCREENM+XHAIRPV	;   SCREENM[XHAIRPV] = a; // pivot point
 	lda	CURTILE		;
 	outsym			;   a = outsym(CURTILE);
 	ldy	#$02		;
-	rot90cw	dey		;   a = rot90cw(a, 2);
+	rot90cw	ey		;   a = rot90cw(a, 2);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta 	SCREENM+XHAIRLT	;   SCREENM[XHAIRLT] = a;
 	jmp	loop7		;   break;
 	
-loop5	bvc	loop6		;
-	ldy	#$01		;  case 1: // 90 degrees clockwise (downward)
-	rot90cw	dey		;   a = rot90cw(a, 1);
+loop5	bvc	loop6		;  case 1: // 90 degrees clockwise (downward)
+	rot90cw			;   a = rot90cw(a, 1);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta 	SCREENM+XHAIRPV	;   SCREENM[XHAIRPV] = a; // pivot point
 	lda	CURTILE		;
 	outsym			;   a = outsym(CURTILE);
-	ldy	#$01		;
-	rot90cw	dey		;   a = rot90cw(a, 1);
+	rot90cw			;   a = rot90cw(a, 1);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta 	SCREENM+XHAIRDN	;   SCREENM[XHAIRDN] = a;
@@ -500,7 +507,7 @@ tofield	.macro
 	.else			; else
 	ldy	#1<<FIELDPW	;  y = 1<<FIELDPW; // +0 in x and y
 	.endif			;
-	rot90cw	dex		; rot90cw(x);
+	rot90cw	ex		; rot90cw(x);
 	tax			;
 	lda	(POINTR2),y	; return x /*new*/, a = POINTR2[y] /*old,=0? */;
 	.endm			;}
