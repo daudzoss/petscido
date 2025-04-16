@@ -17,6 +17,7 @@ XHAIRDN	= XHAIRPV+SCREENW	;
 	
 POINTER = ZP			; static void* POINTER;
 POINTR2 = ZP+2			; static void* POINTR2;
+ZP_TEMP	= ZP+4			; static uint8_t ZP_TEMP;
 	
 CURTILE	.byte	0		; static uint8_t CURTILE; //undefined
 XFLDOFS	.byte	0		; static uint8_t XFLDOFS;
@@ -468,23 +469,68 @@ loopq	cmp	#$0d		;
 	bne	loop7		;  else if (a == 'q' || a == 'Q')
 	rts			;   return;
 	
+nvcases	.macro	r=0,d=0,l=0,u=0	;inline uint2_t nvcases(uint2_t nv, (*r)(),
+.if	\u && \d && \l && \r
+	bpl	++		;                       (*d)(), (*l)(), (*u)()){
+	;; N==1, so up/left
+	bvc	+		; switch ((n << 1) | v) {
+	;; N==1 && V==1, so up
+	jsr	\u		;  case 3: (*u)();
+	jmp	++++		;          break;
+	;; N==1 && V==0, so left
++	jsr	\l		;  case 2: (*l)();
+	jmp	+++		;          break;
+	;; N==0, so right/down
++	bvc	+		;  case 1: (*d)();
+	;; N==0 && V==1, so down
+	jsr	\d		;          break;
+	jmp	++		;  case 0: (*r)();
+	;; N==0 && V==0, so right
++	jsr	\r		; }
++	
+.else
+	error	"must specify four subroutines"
+.endif
+	.endm			;}
+
 place	jsr	stampit		;  else if  (a == '\r')
-	jmp	loop7		;   stampit(); //copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#
+	jmp	loop		;   stampit(); //copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#
 
-loop8	and	#$88		;  else
-	bmi	up_left		;   switch (a) {
+loop8	sta	ZP_TEMP		;
 	and	#$08		;
-	bne	right		;
-	beq	down		;
+	asl			;
+	asl			;
+	asl			;
+	ora	ZP_TEMP		;
+	sta	ZP_TEMP		;
+	
+	lda	PBACKUP		;
+	sta	SCREENM+XHAIRPV	; SCREENM[XHAIRPV] = PBACKUP;
+	lda	LBACKUP		;
+	sta	SCREENM+XHAIRLT	; SCREENM[XHAIRLT] = LBACKUP;
+	lda	RBACKUP		;
+	sta	SCREENM+XHAIRRT	; SCREENM[XHAIRRT] = RBACKUP;
+	lda	UBACKUP		;
+	sta	SCREENM+XHAIRUP	; SCREENM[XHAIRUP] = UBACKUP;
+	lda	DBACKUP		;
+	sta	SCREENM+XHAIRDN	; SCREENM[XHAIRDN] = DBACKUP;
 
-left	jmp	loop7		;
-right	jmp	loop7		;
+	bit	ZP_TEMP		;
+	nvcases	ind,inr,inu,inl	;
+	jmp	loop1		; }
 	
-up_left	and	#$08		;
-	bne	left		;
+inr	
+ind
+inl	
+inu	
+	rts			;
 	
-up	jmp	loop7		;
-down	jmp	loop7		;   }
+angle	.macro			;inline uint2_t angle(uint8_t a) {
+	rol			;
+	rol			;
+	rol			;
+	and	#$03		; return a >>= 6;
+	.endm			;}
 
 tofield	.macro			;inline uint8_t tofield(uint1_t out,
 	lda	CURTILE		;                       register uint8_t* x,
@@ -496,10 +542,7 @@ tofield	.macro			;inline uint8_t tofield(uint1_t out,
 	copynyb			; a = copynyb(a&0x0f); // un-closed-off flags
 	tay			;
 	lda	CURTILE		;
-	rol			;
-	rol			;
-	rol			;
-	and	#$03		;
+	angle			;
 	tax			; x = CURTILE >> 6; // rotation bits only
 	tya			;
 	.if	\1		; if (out)
