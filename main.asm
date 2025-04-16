@@ -15,12 +15,18 @@ XHAIRRT	= XHAIRPV+1		; the initial unplaced tile position, w/ XHAIRPV
 XHAIRUP = XHAIRPV-SCREENW	;
 XHAIRDN	= XHAIRPV+SCREENW	;
 	
-XFLDOFS	= ZP			; static uint8_t XFLDOFS;
-YFLDOFS	= ZP+1			; static uint8_t YFLDOFS;
-POINTRA = ZP+2			; static uint8_t* POINTRA;
-POINTRB = ZP+4			; static uint8_t* POINTRB;
+POINTER = ZP			; static void* POINTER;
+POINTR2 = ZP+2			; static void* POINTR2;
+	
+CURTILE	.byte	0		; static uint8_t CURTILE; //undefined
+XFLDOFS	.byte	0		; static uint8_t XFLDOFS;
+YFLDOFS	.byte	0		; static uint8_t YFLDOFS;
+ROTNOFS .byte	(1<<FIELDPW)+1	; static uint8_t ROTNOFS[] = {(1<<FIELDPW)+1,
+	.byte 	(1<<FIELDPW)*2	;                             (1<<FIELDPW)*2,
+	.byte 	(1<<FIELDPW)-1	;                             (1<<FIELDPW)-1,
+	.byte	0		;                             0};
 
-CURTILE	.byte	$32;arbitrary	; static uint8_t CURTILE = 0x32;
+UNRSLVD	.byte	$05		; static uint8_t UNRSLVD = 5; // from INITILE
 PBACKUP	.byte	$20		; static uint8_t PBACKUP = ' ';
 LBACKUP	.byte	$20		; static uint8_t LBACKUP = ' ';
 RBACKUP .byte	$20		; static uint8_t RBACKUP = ' ';
@@ -49,7 +55,7 @@ symchar	.text	$80|$20		; 0: space, unoccupied spot in play area
 	.text	$80|$6b		; b=11: down straight upward teed rightward
 	.text	$80|$4b		; c=12: up bending leftward
 	.text	$80|$71		; d=13: right straight leftward teed upward
-	.text	$80|$73		; e=14: up straight downward teed leftward
+ 	.text	$80|$73		; e=14: up straight downward teed leftward
 	.text	$80|$5b		; f=15: all directions inward
 
 rot90cw	.macro			;
@@ -58,7 +64,7 @@ rot90cw	.macro			;
 	adc	#$f8		; do {
 	rol			;  a = ((a & 7) << 1) | ((a & 8) ? 1 : 0);
 	and	#$0f		; } while (--y);
-	dey			; return a;
+	\1			; return a;
 	bne	-		;} // rot90cw()
 	.endm			;
 	
@@ -148,28 +154,28 @@ loop3	sta	SCREENM+$1	;  *((void*) (1024+2049)) = a; // 1's digit
 	bvc	loop4		;
 	
 	ldy	#$03		;  case 3: // 270 degrees clockwise (upward)
-	rot90cw			;   a = rot90cw(a, 3);
+	rot90cw	dey		;   a = rot90cw(a, 3);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta SCREENM+SCREENW+2	;   *((void*) 1024+2090 = a; // pivot point
 	lda	ZP		;
 	outsym			;   a = outsym(zp);
 	ldy	#$03		;
-	rot90cw			;   a = rot90cw(a, 3);
+	rot90cw	dey		;   a = rot90cw(a, 3);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta	SCREENM+$2	;   *((void*) (1024+2090-40)) = a;
 	jmp	loop7		;   break;
 		
 loop4	ldy	#$02		;  case 2: // 180 degrees clockwise (leftward)
-	rot90cw			;   a = rot90cw(a, 2);
+	rot90cw	dey		;   a = rot90cw(a, 2);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta SCREENM+SCREENW+2	;   *((void*) 1024+2090 = a; // pivot point
 	lda	ZP		;
 	outsym			;   a = outsym(zp);
 	ldy	#$02		;
-	rot90cw			;   a = rot90cw(a, 2);
+	rot90cw	dey		;   a = rot90cw(a, 2);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta SCREENM+SCREENW+2-1	;   *((void*) (1024+2090-1)) = a;
@@ -177,14 +183,14 @@ loop4	ldy	#$02		;  case 2: // 180 degrees clockwise (leftward)
 	
 loop5	bvc	loop6		;
 	ldy	#$01		;  case 1: // 90 degrees clockwise (downward)
-	rot90cw			;   a = rot90cw(a, 1);
+	rot90cw	dey		;   a = rot90cw(a, 1);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta SCREENM+SCREENW+2	;   *((void*) 1024+2090 = a; // pivot point
 	lda	ZP		;
 	outsym			;   a = outsym(zp);
 	ldy	#$01		;
-	rot90cw			;   a = rot90cw(a, 1);
+	rot90cw	dey		;   a = rot90cw(a, 1);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta SCREENM+2*SCREENW+2	;   *((void*) (1024+2090+40)) = a;
@@ -259,7 +265,7 @@ main	lda	#$93		;
 	sta	selfmod+1	;
 	lda	# >FIELDMX	;
 	sta	selfmod+2	;
-	lda	#$20		;
+	lda	#$00		;
 selfmod	sta	FIELDMX		;
 	dec	selfmod+1	;
 	bne	selfmod		;
@@ -269,8 +275,19 @@ selfmod	sta	FIELDMX		;
 	bcs	selfmod		;
 
 	lda	#1<<(FIELDPW-1)	;
-	sta	XFLDOFS		;
-	sta	YFLDOFS		;
+	sta	XFLDOFS		; XFLDOFS = (1<<(FIELDPW-1)); // middle of field
+	sta	YFLDOFS		; YFLDOFS = (1<<(FIELDPW-1)); // middle of field
+	sta	POINTR2		; POINTR2 = XFLDOFS |
+	lda #1<<((FIELDPW-4)*2)	;           (YFLDOFS << FIELDPW) |
+	ora	#> field	;           field;
+	sta	POINTR2+1	;
+	sec			;
+	lda	POINTR2		;
+	sbc	#1<<FIELDPW	;
+	sta	POINTR2+1	;
+	lda	POINTR2		;
+	sbc	#0		;
+	sta	POINTR2		; POINTR2 -= 1<<FIELDPW; // (XFLDOFS, YFLDOFS-1)
 	
 loop	lda	RNDLOC1		;
 	eor	RNDLOC2		;
@@ -291,8 +308,8 @@ loop1	lda	SCREENM+XHAIRPV	;
 	lda	XHAIRC		;
 	sta	SCREENC+XHAIRPV	;
 	lda	CURTILE		;
-	
-loop2	bit	CURTILE		; // perform the rotation
+
+loop2	bit	CURTILE		; // perform the rotation (repair outer char)
 	bpl	loopb		;
 	bvc	loopa		;
 	lda	UBACKUP		;
@@ -335,28 +352,28 @@ loop3	lda	CURTILE		;  // depict the rotation
 	bvc	loop4		;
 	
 	ldy	#$03		;  case 3: // 270 degrees clockwise (upward)
-	rot90cw			;   a = rot90cw(a, 3);
+	rot90cw	dey		;   a = rot90cw(a, 3);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta 	SCREENM+XHAIRPV	;   *((void*) 1024+2090 = a; // pivot point
 	lda	CURTILE		;
 	outsym			;   a = outsym(zp);
 	ldy	#$03		;
-	rot90cw			;   a = rot90cw(a, 3);
+	rot90cw	dey		;   a = rot90cw(a, 3);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta	SCREENM+XHAIRUP	;   *((void*) (1024+2090-40)) = a;
 	jmp	loop7		;   break;
-		
+
 loop4	ldy	#$02		;  case 2: // 180 degrees clockwise (leftward)
-	rot90cw			;   a = rot90cw(a, 2);
+	rot90cw	dey		;   a = rot90cw(a, 2);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta 	SCREENM+XHAIRPV	;   *((void*) 1024+2090 = a; // pivot point
 	lda	CURTILE		;
 	outsym			;   a = outsym(zp);
 	ldy	#$02		;
-	rot90cw			;   a = rot90cw(a, 2);
+	rot90cw	dey		;   a = rot90cw(a, 2);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta 	SCREENM+XHAIRLT	;   *((void*) (1024+2090-1)) = a;
@@ -364,14 +381,14 @@ loop4	ldy	#$02		;  case 2: // 180 degrees clockwise (leftward)
 	
 loop5	bvc	loop6		;
 	ldy	#$01		;  case 1: // 90 degrees clockwise (downward)
-	rot90cw			;   a = rot90cw(a, 1);
+	rot90cw	dey		;   a = rot90cw(a, 1);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta 	SCREENM+XHAIRPV	;   *((void*) 1024+2090 = a; // pivot point
 	lda	CURTILE		;
 	outsym			;   a = outsym(zp);
 	ldy	#$01		;
-	rot90cw			;   a = rot90cw(a, 1);
+	rot90cw	dey		;   a = rot90cw(a, 1);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta 	SCREENM+XHAIRDN	;   *((void*) (1024+2090+40)) = a;
@@ -388,9 +405,9 @@ loop6	and	#$0f		;  case 0: default: // unrotated (rightward)
 	sta	SCREENM+XHAIRRT	;   *((void*) (1024+2090+1)) = a;
 
 loop7	jsr	$ffe4		;  }
-	beq	loop7		;  do {} while ((a = getchar()) == 0);
+	beq	loop7		;  do {
 
-	cmp	#$91		;
+	cmp	#$91		;   a = getchar();
 	beq	loop8		;
 	cmp	#$11		;
 	beq	loop8		;
@@ -403,12 +420,90 @@ loop7	jsr	$ffe4		;  }
 	bne	loopq		;
 	jmp	loop2		;   continue;
 
-loopq	and	#$5f		;
+loopq	cmp	#$0d		;
+	beq	place		;
+	and	#$5f		;
 	cmp	#$51		;
 	bne	loop7		;  else if (a == 'q' || a == 'Q')
 	rts			;   return;
 	
-loop8	jmp	loop7 ;for now
+place	jsr	stampit		;  else if  (a == '\r')
+	jmp	loop7		;   stampit(); //copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#
+
+loop8	and	#$88		;  else
+	bmi	up_left		;   switch (a) {
+	and	#$08		;
+	bne	right		;
+	beq	down		;
+
+left	jmp	loop7		;
+right	jmp	loop7		;
+	
+up_left	and	#$08		;
+	bne	left		;
+	
+up	jmp	loop7		;
+down	jmp	loop7		;   }
+
+copynyb	.macro
+	and	#$0f		;inline uint8_t copynyb (uint4_t a) {
+	pha			;
+	tsx			;
+	asl			;
+	asl			;
+	asl			;
+	asl			;
+	ora	$101,x		;
+	inx			; return ((a & 0x0f) << 4) | (a & 0x0f);
+	txs			;} // copynyb()
+	.endm
+	
+tofield	.macro
+	sta	CURTILE		;inline uint8_t tofield(uint8_t a,uint1_t out) {
+	.if \1			; uint2_t x;
+	outsym			; uint8_t y;
+	.else			; CURTILE = a;
+	innsym			; a = out ? outsym(CURTILE) : innsym(CURTILE);
+	.endif
+	copynyb			; a = copynyb(a&0x0f); // duplicate low nybble into high (as closed-off flags)
+	tay			;
+	lda	CURTILE		;
+	rol			;
+	rol			;
+	rol			;
+	and	#$03		;
+	tax			; x = CURTILE >> 6; // rotation bits only
+	tya			;
+	.if	\1		; if (out)
+	ldy	ROTNOFS,x	;  y = ROTNOFS[x]; // +1 in x, +1 in y, -1 in x, -1 in y
+	.else			; else
+	ldy	#1<<FIELDPW	;  y = 1<<FIELDPW; // +0 in x and y
+	.endif			;
+	rot90cw	dex		; rot90cw(x);
+	tax			;
+	lda	(POINTR2),y	; return x /*new*/, a = POINTR2[y] /*old,=0? */;
+	.endm			;}
+	
+stampit	and	#$ff		;uint8_t stampit(uint8_t a) {
+	beq	nostamp		; if ((CURTILE = a) != 0)
+	sta	CURTILE		;
+	tofield	0		;
+	beq	nostamp		;  if (tofield(0 /*inner pivoting*/, &x, &y)) {
+	txa			;
+	pha			;   uint8_t stack = x;
+	tofield	1		;
+	beq	+		;   if (tofield(1 /*outer rotating*/, &x, &y)) {
+	txa			;
+	sta	(POINTR2),y	;    POINTR2[y] = x;
+	pla			;
+	ldy	#1<<FIELDPW	;
+	sta	(POINTR2),y	;    POINTR2[1<<FIELDPW] = stack;
+	lda	CURTILE		;    return CURTILE;
+	rts			;   }
++	pla			;  }
+	lda	#0		; return 0;
+nostamp	rts			;}
+	
 .endif	
 
 
