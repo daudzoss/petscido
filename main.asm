@@ -121,12 +121,14 @@ copynyb	.macro
 	
 .if TESTSYM	
 main	lda	#$13		;void main(void) {
+.if 0
 	jsr	$ffd2		; putchar(0x13); // go to screen home
 	ldy	#SCREENW*2+2	;
 	lda	#$20		; for (uint8_t y = SCREEN*2+2; y; y--)
 -	jsr	$ffd2		;  putchar(' '); // for VIC20 (instead of CLR)
 	dey			;
 	bne	-		;
+.endif
 .if SCREENC
 	lda	#$0		; // set black foreground for all characters:
 	sta	SCREENC		; *((void*) SCREENC) = 0;// 16's digit of tile#
@@ -271,10 +273,10 @@ loopb	lda	ZP		;  case 0x1d:
 .endif				;} // main(TESTSYM)
 
 .if TESTFLD
-main	lda	#$93		;
-	jsr	$ffd2		;
+main	lda	#$93		;void main(void) {
+	jsr	$ffd2		; putchar(0x93); // clear screen
 
-	lda	# <FIELDMX	;
+	lda	# <FIELDMX	; uint8_t a;
 	sta	selfmod+1	;
 	lda	# >FIELDMX	;
 	sta	selfmod+2	;
@@ -284,8 +286,8 @@ selfmod	sta	FIELDMX		;
 	bne	selfmod		;
 	dec	selfmod+2	;
 	ldy	selfmod+2	;
-	cpy	# >field	;
-	bcs	selfmod		;
+	cpy	# >field	; for (uint8_t* sm = FIELDMX; sm > field; sm--)
+	bcs	selfmod		;  *sm = 0;
 
 	lda	#1<<(FIELDPW-1)	;
 	sta	XFLDOFS		; XFLDOFS = (1<<(FIELDPW-1)); // middle of field
@@ -325,62 +327,61 @@ selfmod	sta	FIELDMX		;
 loop	lda	RNDLOC1		;
 	eor	RNDLOC2		;
 	and	#$3f		;
-	sta	CURTILE		;
+	sta	CURTILE		; CURTILE = rand() & 0x3f;
 
 loop1	lda	SCREENM+XHAIRPV	;
-	sta	PBACKUP		;
+	sta	PBACKUP		; PBACKUP = SCREENM[XHAIRPV];
 	lda	SCREENM+XHAIRLT	;
-	sta	LBACKUP		;
+	sta	LBACKUP		; LBACKUP = SCREENM[XHAIRLT];
 	lda	SCREENM+XHAIRRT	;
-	sta	RBACKUP		;
+	sta	RBACKUP		; RBACKUP = SCREENM[XHAIRRT];
 	lda	SCREENM+XHAIRUP	;
-	sta	UBACKUP		;
+	sta	UBACKUP		; UBACKUP = SCREENM[XHAIRUP];
 	lda	SCREENM+XHAIRDN	;
-	sta	DBACKUP		;
+	sta	DBACKUP		; DBACKUP = SCREENM[XHAIRDN];
 
 	lda	XHAIRC		;
-	sta	SCREENC+XHAIRPV	;
-	lda	CURTILE		;
+	sta	SCREENC+XHAIRPV	; SCREENC[XHAIRPV] = XHAIRC;
 
 loop2	bit	CURTILE		; // perform the rotation (repair outer char)
 	bpl	loopb		;
-	bvc	loopa		;
-	lda	UBACKUP		;
-	sta	SCREENM+XHAIRUP	;
+	bvc	loopa		; switch (CURTILE >> 6) {
+	lda	UBACKUP		; case 3: // rotate from up (3) to right (0)
+	sta	SCREENM+XHAIRUP	;  SCREENM[XHAIRUP] = UBACKUP;
 	lda	FIELDC		;
-	sta	SCREENC+XHAIRUP	;
+	sta	SCREENC+XHAIRUP	;  SCREENC[XHAIRUP] = FIELDC;
 	lda	XHAIRC		;
-	sta	SCREENC+XHAIRRT	;
-	jmp	loopd		;
-loopa	lda	LBACKUP		;
-	sta	SCREENM+XHAIRLT	;
+	sta	SCREENC+XHAIRRT	;  SCREENC[XHAIRRT] = XHAIRC;
+	jmp	loopd		;  break;
+loopa	lda	LBACKUP		; case 2: // rotate from left (2) to up (3)
+	sta	SCREENM+XHAIRLT	;  SCREENM[XHAIRLT] = LBACKUP;
 	lda	FIELDC		;
-	sta	SCREENC+XHAIRLT	;
+	sta	SCREENC+XHAIRLT	;  SCREENC[XHAIRLT] = FIELDC;
 	lda	XHAIRC		;
-	sta	SCREENC+XHAIRUP	;
-	jmp	loopd		;
+	sta	SCREENC+XHAIRUP	;  SCREENC[XHAIRUP] = XHAIRC;
+	jmp	loopd		;  break;
 loopb	bvc	loopc		;
-	lda	DBACKUP		;
-	sta	SCREENM+XHAIRDN	;
+	lda	DBACKUP		; case 1: // rotate from down (1) to left (2)
+	sta	SCREENM+XHAIRDN	;  SCREENM[XHAIRDN] = DBACKUP;
 	lda	FIELDC		;
-	sta	SCREENC+XHAIRDN	;
+	sta	SCREENC+XHAIRDN	;  SCREENC[XHAIRDN] = FIELDC;
 	lda	XHAIRC		;
-	sta	SCREENC+XHAIRLT	;
-	jmp	loopd		;
-loopc	lda	RBACKUP		;
-	sta	SCREENM+XHAIRRT	;
+	sta	SCREENC+XHAIRLT	;  SCREENC[XHAIRLT] = XHAIRC;
+	jmp	loopd		;  break;
+loopc	lda	RBACKUP		; case 2: // rotate from right (0) to down (1)
+	sta	SCREENM+XHAIRRT	;  SCREENM[XHAIRRT] = LBACKUP;
 	lda	FIELDC		;
-	sta	SCREENC+XHAIRRT	;
+	sta	SCREENC+XHAIRRT	;  SCREENC[XHAIRLT] = FIELDC;
 	lda	XHAIRC		;
-	sta	SCREENC+XHAIRDN	;
-loopd	lda	CURTILE		;
+	sta	SCREENC+XHAIRDN	;  SCREENC[XHAIRDN] = XHAIRC;
+loopd	lda	CURTILE		; }
 	clc			;
 	adc	#$40		;
-	sta	CURTILE		;
+	sta	CURTILE		; CURTILE += (1 << 6);
 
 loop3	lda	CURTILE		;  // depict the rotation
-	innsym			;  a = innsym(zp);
-	bit	CURTILE		;  switch (a >> 6) {
+	innsym			;  a = innsym(CURTILE);
+	bit	CURTILE		;  switch (CURTILE >> 6) {
 	bpl	loop5		;
 	bvc	loop4		;
 	
@@ -388,28 +389,28 @@ loop3	lda	CURTILE		;  // depict the rotation
 	rot90cw	dey		;   a = rot90cw(a, 3);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
-	sta 	SCREENM+XHAIRPV	;   *((void*) 1024+2090 = a; // pivot point
+	sta 	SCREENM+XHAIRPV	;   SCREENM[XHAIRPV] = a; // pivot point
 	lda	CURTILE		;
-	outsym			;   a = outsym(zp);
+	outsym			;   a = outsym(CURTILE);
 	ldy	#$03		;
 	rot90cw	dey		;   a = rot90cw(a, 3);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
-	sta	SCREENM+XHAIRUP	;   *((void*) (1024+2090-40)) = a;
+	sta	SCREENM+XHAIRUP	;   SCREENM[XHAIRUP] = a;
 	jmp	loop7		;   break;
 
 loop4	ldy	#$02		;  case 2: // 180 degrees clockwise (leftward)
 	rot90cw	dey		;   a = rot90cw(a, 2);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
-	sta 	SCREENM+XHAIRPV	;   *((void*) 1024+2090 = a; // pivot point
+	sta 	SCREENM+XHAIRPV	;   SCREENM[XHAIRPV] = a; // pivot point
 	lda	CURTILE		;
-	outsym			;   a = outsym(zp);
+	outsym			;   a = outsym(CURTILE);
 	ldy	#$02		;
 	rot90cw	dey		;   a = rot90cw(a, 2);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
-	sta 	SCREENM+XHAIRLT	;   *((void*) (1024+2090-1)) = a;
+	sta 	SCREENM+XHAIRLT	;   SCREENM[XHAIRLT] = a;
 	jmp	loop7		;   break;
 	
 loop5	bvc	loop6		;
@@ -417,25 +418,25 @@ loop5	bvc	loop6		;
 	rot90cw	dey		;   a = rot90cw(a, 1);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
-	sta 	SCREENM+XHAIRPV	;   *((void*) 1024+2090 = a; // pivot point
+	sta 	SCREENM+XHAIRPV	;   SCREENM[XHAIRPV] = a; // pivot point
 	lda	CURTILE		;
-	outsym			;   a = outsym(zp);
+	outsym			;   a = outsym(CURTILE);
 	ldy	#$01		;
 	rot90cw	dey		;   a = rot90cw(a, 1);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
-	sta 	SCREENM+XHAIRDN	;   *((void*) (1024+2090+40)) = a;
+	sta 	SCREENM+XHAIRDN	;   SCREENM[XHAIRDN] = a;
 	jmp	loop7		;   break;
 
 loop6	and	#$0f		;  case 0: default: // unrotated (rightward)
 	tay			;
 	lda	symchar,y	;   a = symchar[a & 0x0f];
-	sta	SCREENM+XHAIRPV	;   *((void*) 1024+2090 = a; // pivot point
+	sta	SCREENM+XHAIRPV	;   SCREENM[XHAIRPV] = a; // pivot point
 	lda	CURTILE		;
-	outsym			;   a = outsym(zp);
+	outsym			;   a = outsym(CURTILE);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
-	sta	SCREENM+XHAIRRT	;   *((void*) (1024+2090+1)) = a;
+	sta	SCREENM+XHAIRRT	;   SCREENM[XHAIRRT] = a;
 
 loop7	jsr	$ffe4		;  }
 	beq	loop7		;  do {
