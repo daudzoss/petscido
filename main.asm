@@ -486,14 +486,14 @@ up_left	and	#$08		;
 up	jmp	loop7		;
 down	jmp	loop7		;   }
 
-tofield	.macro
-	sta	CURTILE		;inline uint8_t tofield(uint8_t a,uint1_t out) {
-	.if \1			; uint2_t x;
-	outsym			; uint8_t y;
-	.else			; CURTILE = a;
+tofield	.macro			;inline uint8_t tofield(uint1_t out,
+	lda	CURTILE		;                       register uint8_t* x,
+	.if \1			;                       register uint8_t* y) {
+	outsym			;
+	.else			; uint8_t a;
 	innsym			; a = out ? outsym(CURTILE) : innsym(CURTILE);
-	.endif
-	copynyb			; a = copynyb(a&0x0f); // duplicate low nybble into high (as closed-off flags)
+	.endif			;
+	copynyb			; a = copynyb(a&0x0f); // un-closed-off flags
 	tay			;
 	lda	CURTILE		;
 	rol			;
@@ -512,16 +512,15 @@ tofield	.macro
 	lda	(POINTR2),y	; return x /*new*/, a = POINTR2[y] /*old,=0? */;
 	.endm			;}
 	
-stampit	and	#$ff		;uint8_t stampit(uint8_t a) {
-	beq	nostamp		; if ((CURTILE = a) != 0)
-	sta	CURTILE		;
+stampit	lda	CURTILE		;uint8_t stampit(uint8_t a) {
+	beq	nostamp		; if ((CURTILE = a) != 0) // tile not blank
 	tofield	0		;
-	beq	nostamp		;  if (tofield(0 /*inner pivoting*/, &x, &y)) {
+	bne	nostamp		;  if (tofield(0 /*inner*/, a, &x, &y) == 0) {
 	txa			;
-	pha			;   uint8_t stack = x;
+	pha			;   uint8_t stack = x; // will stamp inner last
 	tofield	1		;
-	beq	+		;   if (tofield(1 /*outer rotating*/, &x, &y)) {
-	txa			;
+	bne	+		;   if (tofield(1 /*outer*/, a, &x, &y) == 0) {
+	txa			;    // no tile(s) in this one's location yet
 	sta	(POINTR2),y	;    POINTR2[y] = x;
 	pla			;
 	ldy	#1<<FIELDPW	;
