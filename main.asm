@@ -305,22 +305,22 @@ selfmod	sta	FIELDMX		;
 	lda	#INITILE	;
 	innsym			;
 	copynyb			; a  = copynyb(innsym(INITILE));
-	ldy	#1<<FIELDPW	;
-	dey			;
-	sta	(POINTR2),y	; POINTR2[(1<<FIELDPW) - 1] = a; // (XFLDOFS-1, YFLDOFS)
+	ldy	#(1<<FIELDPW)-2	;
+	sta	(POINTR2),y	; POINTR2[(1<<FIELDPW) - 2] = a; // (XFLDOFS-2, YFLDOFS)
+	and	#$0f		;
 	tay			;
-	lda	symchar,y	; a = symchar[a];
-	sta	SCREENM+XHAIRLT	; SCREENM[XHAIRLT] = a;
+	lda	symchar,y	; a = symchar[a & 0x0f];
+	sta   SCREENM+XHAIRLT-1	; SCREENM[XHAIRLT-1] = a;
 
 	lda	#INITILE	;
 	outsym			;
 	copynyb			; a = copynyb(outsym(INITILE));
-	ldy	#1<<FIELDPW	;
-	nop			;
-	sta	(POINTR2),y	; POINTR2[(1<<FIELDPW) - 0] = a; // (XLFDOFS, YFLDOFS)
+	ldy	#(1<<FIELDPW)-1	;
+	sta	(POINTR2),y	; POINTR2[(1<<FIELDPW) - 0] = a; // (XLFDOFS-1, YFLDOFS)
+	and	#$0f		;
 	tay			;
-	lda	symchar,y	; a = symchar[a];
-	sta	SCREENM+XHAIRPV	; SCREENM[XHAIRPV] = a;
+	lda	symchar,y	; a = symchar[a & 0x0f];
+	sta	SCREENM+XHAIRLT	; SCREENM[XHAIRLT] = a;
 	
 loop	lda	RNDLOC1		;
 	eor	RNDLOC2		;
