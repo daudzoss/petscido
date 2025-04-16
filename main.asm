@@ -106,6 +106,19 @@ outsym	.macro			;static uint4_t outsyma = {1,12,6,14,5,13,7,15};
 	lda	outsyma,y	;}
 	.endm
 
+copynyb	.macro
+	and	#$0f		;inline uint8_t copynyb (uint4_t a) {
+	pha			;
+	tsx			;
+	asl			;
+	asl			;
+	asl			;
+	asl			;
+	ora	$101,x		;
+	inx			; return ((a & 0x0f) << 4) | (a & 0x0f);
+	txs			;} // copynyb()
+	.endm
+	
 .if TESTSYM	
 main	lda	#$13		;void main(void) {
 	jsr	$ffd2		; putchar(0x13); // go to screen home
@@ -279,7 +292,7 @@ selfmod	sta	FIELDMX		;
 	sta	YFLDOFS		; YFLDOFS = (1<<(FIELDPW-1)); // middle of field
 	sta	POINTR2		; POINTR2 = XFLDOFS |
 	lda #1<<((FIELDPW-4)*2)	;           (YFLDOFS << FIELDPW) |
-	ora	#> field	;           field;
+	ora	#> field	;           field; // (XLFDOFS, YFLDOFS)
 	sta	POINTR2+1	;
 	sec			;
 	lda	POINTR2		;
@@ -288,6 +301,26 @@ selfmod	sta	FIELDMX		;
 	lda	POINTR2		;
 	sbc	#0		;
 	sta	POINTR2		; POINTR2 -= 1<<FIELDPW; // (XFLDOFS, YFLDOFS-1)
+	
+	lda	#INITILE	;
+	innsym			;
+	copynyb			; a  = copynyb(innsym(INITILE));
+	ldy	#1<<FIELDPW	;
+	dey			;
+	sta	(POINTR2),y	; POINTR2[(1<<FIELDPW) - 1] = a; // (XFLDOFS-1, YFLDOFS)
+	tay			;
+	lda	symchar,y	; a = symchar[a];
+	sta	SCREENM+XHAIRLT	; SCREENM[XHAIRLT] = a;
+
+	lda	#INITILE	;
+	outsym			;
+	copynyb			; a = copynyb(outsym(INITILE));
+	ldy	#1<<FIELDPW	;
+	nop			;
+	sta	(POINTR2),y	; POINTR2[(1<<FIELDPW) - 0] = a; // (XLFDOFS, YFLDOFS)
+	tay			;
+	lda	symchar,y	; a = symchar[a];
+	sta	SCREENM+XHAIRPV	; SCREENM[XHAIRPV] = a;
 	
 loop	lda	RNDLOC1		;
 	eor	RNDLOC2		;
@@ -445,19 +478,6 @@ up_left	and	#$08		;
 up	jmp	loop7		;
 down	jmp	loop7		;   }
 
-copynyb	.macro
-	and	#$0f		;inline uint8_t copynyb (uint4_t a) {
-	pha			;
-	tsx			;
-	asl			;
-	asl			;
-	asl			;
-	asl			;
-	ora	$101,x		;
-	inx			; return ((a & 0x0f) << 4) | (a & 0x0f);
-	txs			;} // copynyb()
-	.endm
-	
 tofield	.macro
 	sta	CURTILE		;inline uint8_t tofield(uint8_t a,uint1_t out) {
 	.if \1			; uint2_t x;
