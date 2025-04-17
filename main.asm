@@ -1,4 +1,3 @@
-	
 *	= BASIC+1
 	.word	(+), 2055
 	.null	$9e, format("%4d", start)
@@ -14,6 +13,12 @@ XHAIRLT	= XHAIRPV-1		; character to the left of scren center
 XHAIRRT	= XHAIRPV+1		; the initial unplaced tile position, w/ XHAIRPV
 XHAIRUP = XHAIRPV-SCREENW	;
 XHAIRDN	= XHAIRPV+SCREENW	;
+	
+STR
+SBR1U	= SCREENM+SCREENW*(SCREENH-1)-1 ; up 1 row from screen bottom-right corner
+SBR	= SCREENM+SCREENW*(SCREENH-0)-1 ; screen bottom-right corner
+STL1D	= SCREENM+2*SCREENW	; down 1 row from top-left corner
+STL	= SCREENM+SCREENW	; top-left corner (title/tile line is abovee it)
 	
 POINTER = ZP			; static void* POINTER;
 POINTR2 = ZP+2			; static void* POINTR2;
@@ -81,6 +86,20 @@ rot90cw	.macro	decrement=0
 .endif
 	.endm			;} // rot90cw()
 	
+PETSCIDA :?= 0
+.if PETSCIDA
+
+
+
+
+
+
+
+
+
+
+.endif
+	
 ;;;    2^1 2^3
 ;;; 2^0       2^5
 ;;;    2^2 2^4
@@ -133,6 +152,30 @@ copynyb	.macro
 	.endm
 	
 .if TESTSYM	
+nvcases	.macro	r=0,d=0,l=0,u=0	;inline uint2_t nvcases(uint2_t nv, (*r)(),
+.if	\u && \d && \l && \r
+	bpl	++		;                       (*d)(), (*l)(), (*u)()){
+	;; N==1, so up/left
+	bvc	+		; switch ((n << 1) | v) {
+	;; N==1 && V==1, so up
+	jsr	\u		;  case 3: (*u)();
+	jmp	++++		;          break;
+	;; N==1 && V==0, so left
++	jsr	\l		;  case 2: (*l)();
+	jmp	+++		;          break;
+	;; N==0, so right/down
++	bvc	+		;  case 1: (*d)();
+	;; N==0 && V==1, so down
+	jsr	\d		;          break;
+	jmp	++		;  case 0: (*r)();
+	;; N==0 && V==0, so right
++	jsr	\r		; }
++	
+.else
+	error	"must specify four subroutines"
+.endif
+	.endm			;}
+
 main	lda	#$13		;void main(void) {
 .if 0
 	jsr	$ffd2		; putchar(0x13); // go to screen home
@@ -354,7 +397,7 @@ loop1	lda	SCREENM+XHAIRPV	;
 	lda	XHAIRC		;
 	sta	SCREENC+XHAIRPV	; SCREENC[XHAIRPV] = XHAIRC;
 
-loop2	bit	CURTILE		; // perform the rotation (repair outer char)
+loop2	bit	CURTILE		; loop2: // perform the rotation (repair outer char)
 	bpl	loopb		;
 	bvc	loopa		; switch (CURTILE >> 6) {
 	lda	UBACKUP		; case 3: // rotate from up (3) to right (0)
@@ -447,64 +490,69 @@ loop6	and	#$0f		;  case 0: default: // unrotated (rightward)
 	sta	SCREENM+XHAIRRT	;   SCREENM[XHAIRRT] = a;
 
 loop7	jsr	$ffe4		;  }
-	beq	loop7		;  do {
+	beq	loop7		;  while (1) {
+	and	#$df		;   a = getchar() & 0xdf;
 
-	cmp	#$91		;   a = getchar();
-	beq	loop8		;
-	cmp	#$11		;
-	beq	loop8		;
-	cmp	#$9d		;
-	beq	loop8		;
-	cmp	#$1d		;
-	beq 	loop8		;
-	
-	cmp	#$20		;  if (a == ' ')
+	cmp	#$1d		;   if (a == 0x1d)
+	bne	+
+ 	jmp	inright		;    inright();
++	cmp	#$11		;   else if (a == 0x11)
+	bne	+
+	jmp	indown		;    indown();
++	cmp	#$9d		;   else if (a == 0x9d)
+	bne	+
+	jmp	inleft		;    inleft();
++	cmp	#$91		;   else if (a == 0x91)
+	bne	+
+	jmp	inup		;    inup();
++
+WASD	:?= 0
+.if WASD
+	cmp	#'d'		;   else if (a == 0x44)
+	bne	+
+ 	jmp	inright		;    inright();
++	cmp	#'s'		;   else if (a == 0x53)
+	bne	+
+	jmp	indown		;    indown();
++	cmp	#'a'		;   else if (a == 0x41)
+	bne	+
+	jmp	inleft		;    inleft();
++	cmp	#'w'		;   else if (a == 0x57)
+	bne	+
+	jmp	inup		;    inup();
++
+.endif
+IJKL	:?= 0
+.if IJKL
+	cmp	#'l'		;   else if (a == 0x4c)
+	bne 	+
+	jmp	inright		;    inright();
++	cmp	#'k'		;   else if (a == 0x4b)
+	bne	+
+	jmp	indown		;    indown();
++	cmp	#'j'		;   else if (a == 0x4a)
+	bne	+
+	jmp	inleft		;    inleft();
++	cmp	#'i'		;   else if (a == 0x49)
+	bne	+
+	jmp	inup		;    inup();
++
+.endif
+	cmp	#0		;  if (a == ' ' & 0xdf)
 	bne	loopq		;
-	jmp	loop2		;   continue;
+	jmp	loop2		;   goto loop2;
 
 loopq	cmp	#$0d		;
 	beq	place		;
-	and	#$5f		;
-	cmp	#$51		;
+	cmp	#'q'		;
 	bne	loop7		;  else if (a == 'q' || a == 'Q')
 	rts			;   return;
 	
-nvcases	.macro	r=0,d=0,l=0,u=0	;inline uint2_t nvcases(uint2_t nv, (*r)(),
-.if	\u && \d && \l && \r
-	bpl	++		;                       (*d)(), (*l)(), (*u)()){
-	;; N==1, so up/left
-	bvc	+		; switch ((n << 1) | v) {
-	;; N==1 && V==1, so up
-	jsr	\u		;  case 3: (*u)();
-	jmp	++++		;          break;
-	;; N==1 && V==0, so left
-+	jsr	\l		;  case 2: (*l)();
-	jmp	+++		;          break;
-	;; N==0, so right/down
-+	bvc	+		;  case 1: (*d)();
-	;; N==0 && V==1, so down
-	jsr	\d		;          break;
-	jmp	++		;  case 0: (*r)();
-	;; N==0 && V==0, so right
-+	jsr	\r		; }
-+	
-.else
-	error	"must specify four subroutines"
-.endif
-	.endm			;}
-
 place	jsr	stampit		;  else if  (a == '\r')
 	jmp	loop		;   stampit(); //copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#
 
-loop8	sta	ZP_TEMP		;
-	and	#$08		;
-	asl			;
-	asl			;
-	asl			;
-	ora	ZP_TEMP		;
-	sta	ZP_TEMP		;
-	
-	lda	PBACKUP		;
+liftile	.macro			;inline void liftile(void) {
+	lda	PBACKUP		; // could reduce code and redraw just the two obscured characters instead of all five (faster? slower?)
 	sta	SCREENM+XHAIRPV	; SCREENM[XHAIRPV] = PBACKUP;
 	lda	LBACKUP		;
 	sta	SCREENM+XHAIRLT	; SCREENM[XHAIRLT] = LBACKUP;
@@ -514,16 +562,45 @@ loop8	sta	ZP_TEMP		;
 	sta	SCREENM+XHAIRUP	; SCREENM[XHAIRUP] = UBACKUP;
 	lda	DBACKUP		;
 	sta	SCREENM+XHAIRDN	; SCREENM[XHAIRDN] = DBACKUP;
+	.endm			;} // liftile()
 
-	bit	ZP_TEMP		;
-	nvcases	ind,inr,inu,inl	;
-	jmp	loop1		; }
+movptrs	.macro
+	.endm
 	
-inr	
-ind
-inl	
-inu	
-	rts			;
+blitter	.macro	src,dst,ends,opt;
+	
+	.endm			;
+	
+repaint	.macro			;
+	.endm
+	
+inright	movptrs	+1		;void inright(void) {
+	beq	+		; if (movptrs(+1)) {
+	liftile			;  liftile();
+	blitter	STL+1,STL,SBR,-1;  blitter(STL+1,STL,SBR,-1);
+	repaint	-SCREENW/2,-1	;  repaint(-SCREENW/2,-1);
++	jmp	loop1		;  goto loop1; } } // inright()
+	
+indown	movptrs	+(1<<FIELDPW)	;void indown(void) {
+	beq	+		; if (movptrs(+(1<<FIELDPW))) {
+	liftile			;  liftile();
+	blitter	STL1D,STL,SBR,-1;  blitter(STL1D,STL,SBR,-1);
+	repaint	-1,-SCREENH/2-1	;  repaint(-1,-SCREENH/2-1);
++	jmp	loop1		;  goto loop1; } } // indown()
+	
+inleft	movptrs	-1		;void inleft(void) {
+	beq	+		; if (movptrs(-1)) {
+	liftile			;  liftile();
+	blitter	SBR-1,SBR,STL,-1;  blitter(SBR-1,SBR,STL,-1)
+	repaint	+SCREENW/2-1,-1	;  repaint(+SCREENW/2-1,-1);
++	jmp	loop1		;  goto loop1; } } // inleft()
+	
+inup	movptrs	-(1<<FIELDPW)	;void inup(void)
+	beq	+		; if (movptrs(-(1<<FIELDPW))) {
+	liftile			;  liftile();
+	blitter	SBR1U,SBR,STL,-1;  blitter(SBR1U,SBR,STL,-1)
+	repaint	-1,SCREENH/2	;  repaint(-1,SCREENH/2);
++	jmp	loop1		;  goto loop1; } } // inup()
 	
 angle	.macro			;inline uint2_t angle(uint8_t a) {
 	rol			;
