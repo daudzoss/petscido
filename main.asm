@@ -4,7 +4,8 @@
 +	.word 0
 start	jmp	main
 	
-FIELDSZ	= 1<<(2*FIELDPW)	;
+FDIM	= 1<<FIELDPW		;
+FIELDSZ	= FDIM*FDIM		;
 FIELDMX = field+FIELDSZ-1	; last byte of FIELDSZ-aligned region 'field'
 	
 INITILE	= $3e			; start with five rightmost paths open
@@ -25,12 +26,12 @@ POINTR2 = ZP+2			; static void* POINTR2;
 ZP_TEMP	= ZP+4			; static uint8_t ZP_TEMP;
 	
 CURTILE	.byte	0		; static uint8_t CURTILE; //undefined
-XFLDOFS	.byte	0		; static uint8_t XFLDOFS;
-YFLDOFS	.byte	0		; static uint8_t YFLDOFS;
-ROTNOFS .byte	(1<<FIELDPW)+1	; static uint8_t ROTNOFS[] = {(1<<FIELDPW)+1,
-	.byte 	(1<<FIELDPW)*2	;                             (1<<FIELDPW)*2,
-	.byte 	(1<<FIELDPW)-1	;                             (1<<FIELDPW)-1,
-	.byte	0		;                             0};
+XFLDOFS	.byte	FDIM/2		; static uint8_t XFLDOFS = FDIM/2;
+YFLDOFS	.byte	FDIM/2		; static uint8_t YFLDOFS;
+ROTNOFS .byte	FDIM+1		; static const ROTNOFS[] = {FDIM+1,
+	.byte 	FDIM*2		;                           FDIM*2,
+	.byte 	FDIM-1		;                           FDIM-1,
+	.byte	0		;                           0};
 
 UNRSLVD	.byte	$05		; static uint8_t UNRSLVD = 5; // from INITILE
 PBACKUP	.byte	$20		; static uint8_t PBACKUP = ' ';
@@ -327,6 +328,16 @@ loopb	lda	ZP		;  case 0x1d:
 .endif				;} // main(TESTSYM)
 
 .if TESTFLD
+chckptr	.macro	delta		;
+	clc			;
+	lda	POINTR2		;
+	adc	#\delta		;
+	sta	POINTER		;
+	lda	1+POINTR2	;
+	adc	#0		;
+	sta	1+POINTER	; POINTER = POINTR2 + delta;
+	.endm
+	
 main	lda	#$93		;void main(void) {
 	jsr	$ffd2		; putchar(0x93); // clear screen
 
@@ -343,26 +354,27 @@ selfmod	sta	FIELDMX		;
 	cpy	# >field	; for (uint8_t* sm = FIELDMX; sm > field; sm--)
 	bcs	selfmod		;  *sm = 0;
 
-	lda	#1<<(FIELDPW-1)	;
+	lda	#FDIM/2
 	sta	XFLDOFS		; XFLDOFS = (1<<(FIELDPW-1)); // middle of field
 	sta	YFLDOFS		; YFLDOFS = (1<<(FIELDPW-1)); // middle of field
 	sta	POINTR2		; POINTR2 = XFLDOFS |
 	lda #1<<((FIELDPW-4)*2)	;           (YFLDOFS << FIELDPW) |
 	ora	#> field	;           field; // (XLFDOFS, YFLDOFS)
-	sta	POINTR2+1	;
+	sta	1+POINTR2	;
+	
 	sec			;
 	lda	POINTR2		;
-	sbc	#1<<FIELDPW	;
-	sta	POINTR2+1	;
-	lda	POINTR2		;
+	sbc	#FDIM		;
+	sta	POINTR2		;
+	lda	1+POINTR2	;
 	sbc	#0		;
-	sta	POINTR2		; POINTR2 -= 1<<FIELDPW; // (XFLDOFS, YFLDOFS-1)
+	sta	1+POINTR2	; POINTR2 -= FDIM; // (XFLDOFS, YFLDOFS-1)
 	
 	lda	#INITILE	;
 	innsym			;
 	copynyb			; a  = copynyb(innsym(INITILE));
-	ldy	#(1<<FIELDPW)-2	;
-	sta	(POINTR2),y	; POINTR2[(1<<FIELDPW) - 2] = a; // (XFLDOFS-2, YFLDOFS)
+	ldy	#FDIM-2	;
+	sta	(POINTR2),y	; POINTR2[FDIM - 2] = a; // (XFLDOFS-2, YFLDOFS)
 	and	#$0f		;
 	tay			;
 	lda	symchar,y	; a = symchar[a & 0x0f];
@@ -371,8 +383,8 @@ selfmod	sta	FIELDMX		;
 	lda	#INITILE	;
 	outsym			;
 	copynyb			; a = copynyb(outsym(INITILE));
-	ldy	#(1<<FIELDPW)-1	;
-	sta	(POINTR2),y	; POINTR2[(1<<FIELDPW) - 0] = a; // (XLFDOFS-1, YFLDOFS)
+	ldy	#FDIM-1	;
+	sta	(POINTR2),y	; POINTR2[FDIM - 0] = a; // (XLFDOFS-1, YFLDOFS)
 	and	#$0f		;
 	tay			;
 	lda	symchar,y	; a = symchar[a & 0x0f];
@@ -564,8 +576,67 @@ liftile	.macro			;inline void liftile(void) {
 	sta	SCREENM+XHAIRDN	; SCREENM[XHAIRDN] = DBACKUP;
 	.endm			;} // liftile()
 
-movptrs	.macro
-	.endm
+movptrs	.macro	delta		;inline uint1_t movptrs(const int8_t delta) { // FIXME: these waste an enormous moat merely by insisting no non-field squares appear onscreen
+.if \delta == +1
+	lda	#FDIM-SCREENW/2	; if (delta == +1) {
+	cmp	XFLDOFS		;  if (XFLDOFS <= FDIM-SCREENW/2)
+	bcc	+		;   return C = 0;
+	inc	XFLDOFS		;  XFLDOFS += 1;
+	clc			;
+	lda	POINTR2		;
+	adc	#1		;
+	sta	POINTR2		;
+	lda	1+POINTR2	;
+	adc	#0		;
+	sta	1+POINTR2	;  POINTR2 += 1;
+	sec			;  return C = 1; // proceed to scroll screen
++
+.elsif \delta == +FDIM
+	lda	#FDIM-SCREENH/2	; } else if (delta == +FDIM) {
+	cmp	YFLDOFS		;  if (XFLDOFS <= FDIM-SCREENH/2)
+	bcc	+		;   return C = 0;
+	inc	YFLDOFS		;  YFLDOFS += 1;
+	clc			;
+	lda	POINTR2		;
+	adc	#FDIM		;
+	sta	POINTR2		;
+	lda	1+POINTR2	;
+	adc	#0		;
+	sta	1+POINTR2	;  POINTR2 += FDIM;
+	sec			;  return C = 1; // proceed to scroll screen
++	
+.elsif \delta == -1
+	lda	XFLDOFS		; } else if (delta == -1) {
+	cmp	#SCREENW/2	;  if (XFLDOFS >= SCREENW/2)
+	bcc	+		;   return C = 0;
+	dec	XFLDOFS		;  XFLDOFS -= 1;
+	sec			;
+	lda	POINTR2		;
+	sbc	#1		;
+	sta	POINTR2		;
+	lda	1+POINTR2	;
+	sbc	#0		;
+	sta	1+POINTR2	;  POINTR2 -= 1;
+	sec			;  return C = 1; // proceed to scroll screen
++
+.elsif \delta == -FDIM
+	lda	YFLDOFS		; } else if (delta == -FDIM) {
+	cmp	#SCREENH/2	;  if (YFLDOFS >= SCREENW/2)
+	bcc	+		;   return C = 0;
+	dec	YFLDOFS		;  YFLDOFS -= 1;
+	sec			;
+	lda	POINTR2		;
+	sbc	#FDIM		;
+	sta	POINTR2		;
+	lda	1+POINTR2	;
+	sbc	#0		;
+	sta	1+POINTR2	;  POINTR2 -= FDIM;
+	sec			;  return C = 1; // proceed to scroll screen
++
+.else	
+.error "invalid move distance ", \delta
+.endif				; }
+	.endm			;}
 	
 blitter	.macro	src,dst,ends,opt;
 	
@@ -575,28 +646,28 @@ repaint	.macro			;
 	.endm
 	
 inright	movptrs	+1		;void inright(void) {
-	beq	+		; if (movptrs(+1)) {
+	bcc	+		; if (movptrs(+1) == 0) {
 	liftile			;  liftile();
 	blitter	STL+1,STL,SBR,-1;  blitter(STL+1,STL,SBR,-1);
 	repaint	-SCREENW/2,-1	;  repaint(-SCREENW/2,-1);
 +	jmp	loop1		;  goto loop1; } } // inright()
 	
-indown	movptrs	+(1<<FIELDPW)	;void indown(void) {
-	beq	+		; if (movptrs(+(1<<FIELDPW))) {
+indown	movptrs	+FDIM		;void indown(void) {
+	beq	+		; if (movptrs(+FDIM) == 0) {
 	liftile			;  liftile();
 	blitter	STL1D,STL,SBR,-1;  blitter(STL1D,STL,SBR,-1);
 	repaint	-1,-SCREENH/2-1	;  repaint(-1,-SCREENH/2-1);
 +	jmp	loop1		;  goto loop1; } } // indown()
 	
 inleft	movptrs	-1		;void inleft(void) {
-	beq	+		; if (movptrs(-1)) {
+	beq	+		; if (movptrs(-1) == 0) {
 	liftile			;  liftile();
 	blitter	SBR-1,SBR,STL,-1;  blitter(SBR-1,SBR,STL,-1)
 	repaint	+SCREENW/2-1,-1	;  repaint(+SCREENW/2-1,-1);
 +	jmp	loop1		;  goto loop1; } } // inleft()
 	
-inup	movptrs	-(1<<FIELDPW)	;void inup(void)
-	beq	+		; if (movptrs(-(1<<FIELDPW))) {
+inup	movptrs	-FDIM		;void inup(void)
+	beq	+		; if (movptrs(-FDIM) == 0) {
 	liftile			;  liftile();
 	blitter	SBR1U,SBR,STL,-1;  blitter(SBR1U,SBR,STL,-1)
 	repaint	-1,SCREENH/2	;  repaint(-1,SCREENH/2);
@@ -625,7 +696,7 @@ tofield	.macro			;inline uint8_t tofield(uint1_t out,
 	.if	\1		; if (out)
 	ldy	ROTNOFS,x	;  y = ROTNOFS[x]; // +1 in x, +1 in y, -1 in x, -1 in y
 	.else			; else
-	ldy	#1<<FIELDPW	;  y = 1<<FIELDPW; // +0 in x and y
+	ldy	#FDIM		;  y = FDIM; // +0 in x and y
 	.endif			;
 	rot90cw	ex		; rot90cw(x);
 	tax			;
@@ -643,8 +714,8 @@ stampit	lda	CURTILE		;uint8_t stampit(uint8_t a) {
 	txa			;    // no tile(s) in this one's location yet
 	sta	(POINTR2),y	;    POINTR2[y] = x;
 	pla			;
-	ldy	#1<<FIELDPW	;
-	sta	(POINTR2),y	;    POINTR2[1<<FIELDPW] = stack;
+	ldy	#FDIM		;
+	sta	(POINTR2),y	;    POINTR2[FDIM] = stack;
 	lda	CURTILE		;    return CURTILE;
 	rts			;   }
 +	pla			;  }
