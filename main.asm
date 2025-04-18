@@ -65,8 +65,8 @@ symchar	.text	$80|$20		; 0: space, unoccupied spot in play area
  	.text	$80|$73		; e=14: up straight downward teed leftward
 	.text	$80|$5b		; f=15: all directions inward
 
-ex = 1
-ey = 2
+dx = 1
+dy = 2
 rot90cw	.macro	decrement=0
 	and	#$0f		;inline uint8_t rot90cw(uint4_t a,
 .if \decrement
@@ -87,18 +87,31 @@ rot90cw	.macro	decrement=0
 .endif
 	.endm			;} // rot90cw()
 	
+DECKREM	.text	$46
+deck
 PETSCIDA :?= 0
 .if PETSCIDA
-
-
-
-
-
-
-
-
-
-
+	.text	$01,$21,$31,$33,$28,$01,$21
+	.text	$29,$2d,$30,$09,$2b,$39,$31
+	.text	$28,$39,$35,$39,$29,$30,$11
+	.text	$22,$11,$31,$2a,$29,$24,$09
+	.text	$29,$34,$31,$28,$12,$10,$08
+	.text	$0a,$18,$0c,$03,$38,$1e,$1a
+	.text	$12,$0f,$3a,$1e,$1c,$0c,$17
+	.text	$3c,$14,$18,$13,$2e,$1a,$0b
+	.text	$32,$07,$36,$1c,$15,$2c,$0d
+	.text	$2e,$19,$08,$10,$19,$36,$19
+.else
+	.text	0,0,0,0,0,0,0
+	.text	0,0,0,0,0,0,0
+	.text	0,0,0,0,0,0,0
+	.text	0,0,0,0,0,0,0
+	.text	0,0,0,0,0,0,0
+	.text	0,0,0,0,0,0,0
+	.text	0,0,0,0,0,0,0
+	.text	0,0,0,0,0,0,0
+	.text	0,0,0,0,0,0,0
+	.text	0,0,0,0,0,0,0
 .endif
 	
 ;;;    2^1 2^3
@@ -226,28 +239,28 @@ loop3	sta	SCREENM+$1	;  *((void*) (1024+2049)) = a; // 1's digit
 	bvc	loop4		;
 	
 	ldy	#$03		;  case 3: // 270 degrees clockwise (upward)
-	rot90cw	ey		;   a = rot90cw(a, 3);
+	rot90cw	dy		;   a = rot90cw(a, 3);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta SCREENM+SCREENW+2	;   *((void*) 1024+2090 = a; // pivot point
 	lda	ZP		;
 	outsym			;   a = outsym(zp);
 	ldy	#$03		;
-	rot90cw	ey		;   a = rot90cw(a, 3);
+	rot90cw	dy		;   a = rot90cw(a, 3);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta	SCREENM+$2	;   *((void*) (1024+2090-40)) = a;
 	jmp	loop7		;   break;
 		
 loop4	ldy	#$02		;  case 2: // 180 degrees clockwise (leftward)
-	rot90cw	ey		;   a = rot90cw(a, 2);
+	rot90cw	dy		;   a = rot90cw(a, 2);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta SCREENM+SCREENW+2	;   *((void*) 1024+2090 = a; // pivot point
 	lda	ZP		;
 	outsym			;   a = outsym(zp);
 	ldy	#$02		;
-	rot90cw	ey		;   a = rot90cw(a, 2);
+	rot90cw	dy		;   a = rot90cw(a, 2);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta SCREENM+SCREENW+2-1	;   *((void*) (1024+2090-1)) = a;
@@ -451,28 +464,28 @@ loopd	lda	CURTILE		; }
 	bvc	loop4		;
 	
 	ldy	#$03		;  case 3: // 270 degrees clockwise (upward)
-	rot90cw	ey		;   a = rot90cw(a, 3);
+	rot90cw	dy		;   a = rot90cw(a, 3);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta 	SCREENM+XHAIRPV	;   SCREENM[XHAIRPV] = a; // pivot point
 	lda	CURTILE		;
 	outsym			;   a = outsym(CURTILE);
 	ldy	#$03		;
-	rot90cw	ey		;   a = rot90cw(a, 3);
+	rot90cw	dy		;   a = rot90cw(a, 3);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta	SCREENM+XHAIRUP	;   SCREENM[XHAIRUP] = a;
 	jmp	loop7		;   break;
 
 loop4	ldy	#$02		;  case 2: // 180 degrees clockwise (leftward)
-	rot90cw	ey		;   a = rot90cw(a, 2);
+	rot90cw	dy		;   a = rot90cw(a, 2);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta 	SCREENM+XHAIRPV	;   SCREENM[XHAIRPV] = a; // pivot point
 	lda	CURTILE		;
 	outsym			;   a = outsym(CURTILE);
 	ldy	#$02		;
-	rot90cw	ey		;   a = rot90cw(a, 2);
+	rot90cw	dy		;   a = rot90cw(a, 2);
 	tay			;
 	lda	symchar,y	;   a = symchar[a];
 	sta 	SCREENM+XHAIRLT	;   SCREENM[XHAIRLT] = a;
@@ -638,30 +651,10 @@ movptrs	.macro	delta		;inline uint1_t movptrs(const int8_t delta) { // FIXME: th
 .endif				; }
 	.endm			;}
 	
-.if 0
-	lda	1+POINTER	;
-	pha			;
-	lda	POINTER		; uint8_t* POINTER; 
-	pha			;
-	lda	1+POINTR2	;
-	pha			;
-	lda	POINTR2		;
-	pha			; uint8_t* POINTER2;
-
-	pla			;
-	sta	POINTR2		;
-	pla			;
-	sta	1+POINTR2	;
-	pla			;
-	sta	POINTER		;
-	pla			;
-	sta	1+POINTER	;
-.endif
-	
 blitter	.macro	src,dst,ends,opt;
 .if \src < \dst
-	lda	# <\src		;
-	sta	(+)-2		;
+	lda	# <\src		;void blitter(uint8_t* src, uint8_t* dst,
+	sta	(+)-2		;             uint8_t* ends) { // what was opt?
 	lda	# >\src		;
 	sta	(+)-1		;
 	lda	# <\dst		;
@@ -673,13 +666,13 @@ blitter	.macro	src,dst,ends,opt;
 +	sta	$0000		;} // blitter()                            //+4T
 	lda	(-)+1		;                                          //+4T
 	beq	++		;------+                          // usually +2T
-	cmp	# <\ends	;      |                          // usually +2T
+	cmp	# <\ends	;      |                                   //+2T
 	beq	++++++		;--------+                        // usually +2T
 	dec	(-)+1		;      | |                        // usually +6T
 	lda	(-)+4		;      | |                        // usually +4T
 	beq	+		;--+   | |                        // usually +2T
-	dec	(-)+4		;  |   | |                                // +6T
-	jmp	-		; // +3T=39T; 39T*~1000=~39000T=39ms@1MHz,~25fps
+	dec	(-)+4		;  |   | |                                 //+6T
+	jmp	-		;  |   | | // +3T=39T; ~39000T=39ms@1MHz, ~25fps
 	
 	;; addr for sta is $__00, addr for lda already decremented (not \ends)
 +	dec	(-)+4		;<-+   | |
@@ -733,7 +726,35 @@ blitter	.macro	src,dst,ends,opt;
 	bne	-		;
 +
 .elsif \src > \dst
+	lda	# <\src		;void blitter(uint8_t* src, uint8_t* dst,
+	sta	(+)-2		;             uint8_t* ends) { // what was opt?
+	lda	# >\src		;
+	sta	(+)-1		;
+	lda	# <\dst		;
+	sta	(+)+1		;
+	lda	# >\dst		;
+	sta	(+)+2		;
 	
+-	lda	$0000		; do *dst++ = *src; while (src++ != ends); // 4T
++	sta	$0000		;} // blitter()                            //+4T
+	lda	(-)+1		;                                          //+4T
+	cmp	# <\ends	;                                          //+2T
+	beq	+++		;------+                          // usually +2T
+	inc	(-)+1		;      |                                   //+6T
+	bne	+		;--+   |                          // usually +3T
+	inc	(-)+2		;  |   |                          // usually  0T
++	inc	(-)+4		;<-+   |                                   //+6T
+	bne	+		;----+ |                          // usually +3T
+	inc	(-)+5		;    | |                          // usually  0T
++	bne	-		;<---+ |                          // +3T = 37T
++	inc	(-)+1		;<-----+
+	bne	+		;--+
+	inc	(-)+2		;  |
++	inc	(-)+4		;<-+
+	bne	+		;----+
+	inc	(-)+5		;    |
+	bne	-		;<---+
++
 .else
 .error \src, " cannot equal ",\dst
 .endif
@@ -746,7 +767,9 @@ inright	movptrs	+1		;void inright(void) {
 	bcs	+		; if (movptrs(+1) == 0) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(STL+1,STL,SBR,-1);
+ jmp loop7
 	blitter	STL+1,STL,SBR,-1;  repaint(-SCREENW/2,-1);
+ jmp loop7
 	repaint	-SCREENW/2,-1	;  goto loop1; }
 	jmp	loop1		;} // inright()
 	
@@ -754,7 +777,9 @@ indown	movptrs	+FDIM		;void indown(void) {
 	bcs	+		; if (movptrs(+FDIM) == 0) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(STL1D,STL,SBR,-1);
+ jmp loop7
 	blitter	STL1D,STL,SBR,-1;  repaint(-1,-SCREENH/2-1);
+ jmp loop7
 	repaint	-1,-SCREENH/2-1	;  goto loop1; }
 	jmp	loop1		;} // indown()
 	
@@ -762,7 +787,9 @@ inleft	movptrs	-1		;void inleft(void) {
 	bcs	+		; if (movptrs(-1) == 0) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(SBR-1,SBR,STL,-1)
+ jmp loop7
 	blitter	SBR-1,SBR,STL,-1;  repaint(+SCREENW/2-1,-1);
+ jmp loop7
 	repaint	+SCREENW/2-1,-1	;  goto loop1; }
 	jmp	loop1		;} // inleft()
 	
@@ -770,7 +797,9 @@ inup	movptrs	-FDIM		;void inup(void)
 	bcs	+		; if (movptrs(-FDIM) == 0) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(SBR1U,SBR,STL,-1)
+ jmp loop7
 	blitter	SBR1U,SBR,STL,-1;  repaint(-1,SCREENH/2);
+ jmp loop7
 	repaint	-1,SCREENH/2	;  goto loop1; }
 	jmp	loop1		;} // inup()
 	
@@ -799,7 +828,7 @@ tofield	.macro			;inline uint8_t tofield(uint1_t out,
 	.else			; else
 	ldy	#FDIM		;  y = FDIM; // +0 in x and y
 	.endif			;
-	rot90cw	ex		; rot90cw(x);
+	rot90cw	dx		; rot90cw(x);
 	tax			;
 	lda	(POINTR2),y	; return x /*new*/, a = POINTR2[y] /*old,=0? */;
 	.endm			;}
