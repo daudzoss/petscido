@@ -662,8 +662,8 @@ blitter	.macro	src,dst,ends,opt;
 	lda	# >\dst		;
 	sta	(+)+2		;
 	
--	lda	$0000		; do *dst-- = *src; while (src-- != ends); // 4T
-+	sta	$0000		;} // blitter()                            //+4T
+-	lda	$ffff		; do *dst-- = *src; while (src-- != ends); // 4T
++	sta	$ffff		;} // blitter()                            //+4T
 	lda	(-)+1		;                                          //+4T
 	beq	++		;------+                          // usually +2T
 	cmp	# <\ends	;      |                                   //+2T
@@ -735,8 +735,8 @@ blitter	.macro	src,dst,ends,opt;
 	lda	# >\dst		;
 	sta	(+)+2		;
 	
--	lda	$0000		; do *dst++ = *src; while (src++ != ends); // 4T
-+	sta	$0000		;} // blitter()                            //+4T
+-	lda	$ffff		; do *dst++ = *src; while (src++ != ends); // 4T
++	sta	$ffff		;} // blitter()                            //+4T
 	lda	(-)+1		;                                          //+4T
 	cmp	# <\ends	;                                          //+2T
 	beq	+++		;------+                          // usually +2T
@@ -767,9 +767,7 @@ inright	movptrs	+1		;void inright(void) {
 	bcs	+		; if (movptrs(+1) == 0) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(STL+1,STL,SBR,-1);
- jmp loop7
 	blitter	STL+1,STL,SBR,-1;  repaint(-SCREENW/2,-1);
- jmp loop7
 	repaint	-SCREENW/2,-1	;  goto loop1; }
 	jmp	loop1		;} // inright()
 	
@@ -777,9 +775,7 @@ indown	movptrs	+FDIM		;void indown(void) {
 	bcs	+		; if (movptrs(+FDIM) == 0) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(STL1D,STL,SBR,-1);
- jmp loop7
 	blitter	STL1D,STL,SBR,-1;  repaint(-1,-SCREENH/2-1);
- jmp loop7
 	repaint	-1,-SCREENH/2-1	;  goto loop1; }
 	jmp	loop1		;} // indown()
 	
@@ -787,9 +783,7 @@ inleft	movptrs	-1		;void inleft(void) {
 	bcs	+		; if (movptrs(-1) == 0) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(SBR-1,SBR,STL,-1)
- jmp loop7
 	blitter	SBR-1,SBR,STL,-1;  repaint(+SCREENW/2-1,-1);
- jmp loop7
 	repaint	+SCREENW/2-1,-1	;  goto loop1; }
 	jmp	loop1		;} // inleft()
 	
@@ -797,9 +791,7 @@ inup	movptrs	-FDIM		;void inup(void)
 	bcs	+		; if (movptrs(-FDIM) == 0) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(SBR1U,SBR,STL,-1)
- jmp loop7
 	blitter	SBR1U,SBR,STL,-1;  repaint(-1,SCREENH/2);
- jmp loop7
 	repaint	-1,SCREENH/2	;  goto loop1; }
 	jmp	loop1		;} // inup()
 	
