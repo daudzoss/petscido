@@ -353,7 +353,12 @@ chckptr	.macro	delta		;
 	
 main	lda	#$93		;void main(void) {
 	jsr	$ffd2		; putchar(0x93); // clear screen
-
+ lda FIELDC
+ ldy #$fa
+- sta SCREENC-1,y
+ sta SCREENC-1+$fa,y ; FIXME: harmless workaround (for vic20 screen not having color already set?)
+ dey
+ bne -
 	lda	# <FIELDMX	; uint8_t a;
 	sta	selfmod+1	;
 	lda	# >FIELDMX	;
