@@ -651,10 +651,10 @@ movptrs	.macro	delta		;inline uint1_t movptrs(const int8_t delta) { // FIXME: th
 .endif				; }
 	.endm			;}
 	
-blitter	.macro	src,dst,ends,opt;
+blitter	.macro	src,dst,ends	;
 .if \src < \dst
 	lda	# <\src		;void blitter(uint8_t* src, uint8_t* dst,
-	sta	(+)-2		;             uint8_t* ends) { // what was opt?
+	sta	(+)-2		;             uint8_t* ends) {
 	lda	# >\src		;
 	sta	(+)-1		;
 	lda	# <\dst		;
@@ -739,21 +739,23 @@ blitter	.macro	src,dst,ends,opt;
 +	sta	$ffff		;} // blitter()                            //+4T
 	lda	(-)+1		;                                          //+4T
 	cmp	# <\ends	;                                          //+2T
-	beq	+++		;------+                          // usually +2T
-	inc	(-)+1		;      |                                   //+6T
-	bne	+		;--+   |                          // usually +3T
-	inc	(-)+2		;  |   |                          // usually  0T
-+	inc	(-)+4		;<-+   |                                   //+6T
-	bne	+		;----+ |                          // usually +3T
-	inc	(-)+5		;    | |                          // usually  0T
-+	bne	-		;<---+ |                          // +3T = 37T
-+	inc	(-)+1		;<-----+
-	bne	+		;--+
-	inc	(-)+2		;  |
-+	inc	(-)+4		;<-+
-	bne	+		;----+
+	beq	++		;------+                          // usually +2T
+	inc	(-)+1		;    ^ |                                   //+6T
+	bne	+		;--+ | |                          // usually +3T
+	inc	(-)+2		;  | | |                          // usually  0T
++	inc	(-)+4		;<-+ | |                                   //+6T
+	bne	-		;----+ |                          // usually +3T
+	inc	(-)+5		;    | |
+	bne	-		;----+ |                          // =34T
++	cmp	# >\ends	;<-----+
+	beq	++		;->.endm
+ 	inc	(-)+1		;    ^
+	bne	+		;--+ |
+	inc	(-)+2		;  | |
++	inc	(-)+4		;<-+ |
+	bne	-		;----+
 	inc	(-)+5		;    |
-	bne	-		;<---+
+	bne	-		;----+
 +
 .else
 .error \src, " cannot equal ",\dst
@@ -766,16 +768,18 @@ repaint	.macro			;
 inright	movptrs	+1		;void inright(void) {
 	bcs	+		; if (movptrs(+1) == 0) {
 	jmp	loop7		;  liftile();
-+	liftile			;  blitter(STL+1,STL,SBR,-1);
-	blitter	STL+1,STL,SBR,-1;  repaint(-SCREENW/2,-1);
++	liftile			;  blitter(STL+1,STL,SBR);
+	blitter	STL+1,STL,SBR	;  repaint(-SCREENW/2,-1);
+; brk
 	repaint	-SCREENW/2,-1	;  goto loop1; }
 	jmp	loop1		;} // inright()
 	
 indown	movptrs	+FDIM		;void indown(void) {
 	bcs	+		; if (movptrs(+FDIM) == 0) {
 	jmp	loop7		;  liftile();
-+	liftile			;  blitter(STL1D,STL,SBR,-1);
-	blitter	STL1D,STL,SBR,-1;  repaint(-1,-SCREENH/2-1);
++	liftile			;  blitter(STL1D,STL,SBR);
+	blitter	STL1D,STL,SBR	;  repaint(-1,-SCREENH/2-1);
+; brk
 	repaint	-1,-SCREENH/2-1	;  goto loop1; }
 	jmp	loop1		;} // indown()
 	
@@ -783,15 +787,17 @@ inleft	movptrs	-1		;void inleft(void) {
 	bcs	+		; if (movptrs(-1) == 0) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(SBR-1,SBR,STL,-1)
-	blitter	SBR-1,SBR,STL,-1;  repaint(+SCREENW/2-1,-1);
+	blitter	SBR-1,SBR,STL	;  repaint(+SCREENW/2-1);
+; brk
 	repaint	+SCREENW/2-1,-1	;  goto loop1; }
 	jmp	loop1		;} // inleft()
 	
 inup	movptrs	-FDIM		;void inup(void)
 	bcs	+		; if (movptrs(-FDIM) == 0) {
 	jmp	loop7		;  liftile();
-+	liftile			;  blitter(SBR1U,SBR,STL,-1)
-	blitter	SBR1U,SBR,STL,-1;  repaint(-1,SCREENH/2);
++	liftile			;  blitter(SBR1U,SBR,STL)
+	blitter	SBR1U,SBR,STL	;  repaint(-1,SCREENH/2);
+; brk
 	repaint	-1,SCREENH/2	;  goto loop1; }
 	jmp	loop1		;} // inup()
 	
