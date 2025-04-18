@@ -2,3 +2,7 @@
 *~
 *.lst
 *.prg
+header.inc
+*.ps
+*.pdf
+

@@ -78,7 +78,7 @@ rot90cw	.macro	decrement=0
 	rol			;  a = ((a & 7) << 1) | ((a & 8) ? 1 : 0);
 	and	#$0f		; } while (--y);
 .if \decrement
-	.if \decrement-1
+	.if \decrement == dy
 	 dey
 	.else
 	 dex
@@ -87,9 +87,9 @@ rot90cw	.macro	decrement=0
 .endif
 	.endm			;} // rot90cw()
 	
-DECKREM	.text	$46
+DECKREM	.text	pstdeck-deck
 deck
-PETSCIDA :?= 0
+PETSCIDA :?= 1;;; FIXME :?= 0 after default deck no longer all zeroes
 .if PETSCIDA
 	.text	$01,$21,$31,$33,$28,$01,$21
 	.text	$29,$2d,$30,$09,$2b,$39,$31
@@ -113,6 +113,7 @@ PETSCIDA :?= 0
 	.text	0,0,0,0,0,0,0
 	.text	0,0,0,0,0,0,0
 .endif
+pstdeck
 	
 ;;;    2^1 2^3
 ;;; 2^0       2^5
@@ -370,7 +371,7 @@ selfmod	sta	FIELDMX		;
 	dec	selfmod+2	;
 	ldy	selfmod+2	;
 	cpy	# >field	; for (uint8_t* sm = FIELDMX; sm > field; sm--)
-	bcs	selfmod		;  *sm = 0;
+	bcs	selfmod		;  *sm = 0; // whole field starts blanked
 
 	lda	#FDIM/2
 	sta	XFLDOFS		; XFLDOFS = (1<<(FIELDPW-1)); // middle of field
@@ -408,184 +409,191 @@ selfmod	sta	FIELDMX		;
 	lda	symchar,y	; a = symchar[a & 0x0f];
 	sta	SCREENM+XHAIRLT	; SCREENM[XHAIRLT] = a;
 	
-loop	lda	RNDLOC1		;
-	eor	RNDLOC2		;
-	and	#$3f		;
-	sta	CURTILE		; CURTILE = rand() & 0x3f;
+loop	ldy	DECKREM		; for (;;) { // place a new current tile
+	bne	+		;  if (DECKREM == 0)
+	rts			;   return; // deck exhausted without winning
++	dey			;
+	lda	deck,y		;
+	sty	DECKREM		;
+	sta	CURTILE		;  CURTILE = deck[--DECKREM];
 
-	sec			;
+	sec			;  for (uint1_t c = 1; ; c = 0) { // new position
 loop1	lda	SCREENM+XHAIRPV	;
-	sta	PBACKUP		; PBACKUP = SCREENM[XHAIRPV];
+	sta	PBACKUP		;   PBACKUP = SCREENM[XHAIRPV];
 	lda	SCREENM+XHAIRLT	;
-	sta	LBACKUP		; LBACKUP = SCREENM[XHAIRLT];
+	sta	LBACKUP		;   LBACKUP = SCREENM[XHAIRLT];
 	lda	SCREENM+XHAIRRT	;
-	sta	RBACKUP		; RBACKUP = SCREENM[XHAIRRT];
+	sta	RBACKUP		;   RBACKUP = SCREENM[XHAIRRT];
 	lda	SCREENM+XHAIRUP	;
-	sta	UBACKUP		; UBACKUP = SCREENM[XHAIRUP];
+	sta	UBACKUP		;   UBACKUP = SCREENM[XHAIRUP];
 	lda	SCREENM+XHAIRDN	;
-	sta	DBACKUP		; DBACKUP = SCREENM[XHAIRDN];
+	sta	DBACKUP		;   DBACKUP = SCREENM[XHAIRDN];
 
 	lda	XHAIRC		;
-	sta	SCREENC+XHAIRPV	; SCREENC[XHAIRPV] = XHAIRC;
+	sta	SCREENC+XHAIRPV	;   SCREENC[XHAIRPV] = XHAIRC;
 	bcs	loop2		;
 	
-	lda	#$c0		;
-	adc	CURTILE		;
-	sta	CURTILE		;
+	lda	#$c0		;   // we're in a new position and in order to
+	adc	CURTILE		;   // keep the original rotation we need to
+	sta	CURTILE		;   CURTILE += 0xc0; // rotate ccw before cw:
 
-loop2	bit	CURTILE		; loop2: // perform the rotation (repair outer char)
+loop2	bit	CURTILE		;   for (;;) { // new rot'n (repair outer char)
 	bpl	loopb		;
-	bvc	loopa		; switch (CURTILE >> 6) {
-	lda	UBACKUP		; case 3: // rotate from up (3) to right (0)
-	sta	SCREENM+XHAIRUP	;  SCREENM[XHAIRUP] = UBACKUP;
+	bvc	loopa		;    switch (CURTILE >> 6) {
+	lda	UBACKUP		;    case 3: // rotate from up (3) to right (0)
+	sta	SCREENM+XHAIRUP	;     SCREENM[XHAIRUP] = UBACKUP;
 	lda	FIELDC		;
-	sta	SCREENC+XHAIRUP	;  SCREENC[XHAIRUP] = FIELDC;
+	sta	SCREENC+XHAIRUP	;     SCREENC[XHAIRUP] = FIELDC;
 	lda	XHAIRC		;
-	sta	SCREENC+XHAIRRT	;  SCREENC[XHAIRRT] = XHAIRC;
-	jmp	loopd		;  break;
-loopa	lda	LBACKUP		; case 2: // rotate from left (2) to up (3)
-	sta	SCREENM+XHAIRLT	;  SCREENM[XHAIRLT] = LBACKUP;
+	sta	SCREENC+XHAIRRT	;     SCREENC[XHAIRRT] = XHAIRC;
+	jmp	loopd		;     break;
+loopa	lda	LBACKUP		;    case 2: // rotate from left (2) to up (3)
+	sta	SCREENM+XHAIRLT	;     SCREENM[XHAIRLT] = LBACKUP;
 	lda	FIELDC		;
-	sta	SCREENC+XHAIRLT	;  SCREENC[XHAIRLT] = FIELDC;
+	sta	SCREENC+XHAIRLT	;     SCREENC[XHAIRLT] = FIELDC;
 	lda	XHAIRC		;
-	sta	SCREENC+XHAIRUP	;  SCREENC[XHAIRUP] = XHAIRC;
-	jmp	loopd		;  break;
+	sta	SCREENC+XHAIRUP	;     SCREENC[XHAIRUP] = XHAIRC;
+	jmp	loopd		;     break;
 loopb	bvc	loopc		;
-	lda	DBACKUP		; case 1: // rotate from down (1) to left (2)
-	sta	SCREENM+XHAIRDN	;  SCREENM[XHAIRDN] = DBACKUP;
+	lda	DBACKUP		;    case 1: // rotate from down (1) to left (2)
+	sta	SCREENM+XHAIRDN	;     SCREENM[XHAIRDN] = DBACKUP;
 	lda	FIELDC		;
-	sta	SCREENC+XHAIRDN	;  SCREENC[XHAIRDN] = FIELDC;
+	sta	SCREENC+XHAIRDN	;     SCREENC[XHAIRDN] = FIELDC;
 	lda	XHAIRC		;
-	sta	SCREENC+XHAIRLT	;  SCREENC[XHAIRLT] = XHAIRC;
-	jmp	loopd		;  break;
-loopc	lda	RBACKUP		; case 2: // rotate from right (0) to down (1)
-	sta	SCREENM+XHAIRRT	;  SCREENM[XHAIRRT] = LBACKUP;
+	sta	SCREENC+XHAIRLT	;     SCREENC[XHAIRLT] = XHAIRC;
+	jmp	loopd		;     break;
+loopc	lda	RBACKUP		;    case 2: // rotate from right (0) to down (1)
+	sta	SCREENM+XHAIRRT	;     SCREENM[XHAIRRT] = LBACKUP;
 	lda	FIELDC		;
-	sta	SCREENC+XHAIRRT	;  SCREENC[XHAIRLT] = FIELDC;
+	sta	SCREENC+XHAIRRT	;     SCREENC[XHAIRLT] = FIELDC;
 	lda	XHAIRC		;
-	sta	SCREENC+XHAIRDN	;  SCREENC[XHAIRDN] = XHAIRC;
-loopd	lda	CURTILE		; }
+	sta	SCREENC+XHAIRDN	;     SCREENC[XHAIRDN] = XHAIRC;
+loopd	lda	CURTILE		;    }
 	clc			;
 	adc	#$40		;
-	sta	CURTILE		; CURTILE += (1 << 6);
+	sta	CURTILE		;    CURTILE += (1 << 6);
 	
-	innsym			;  // depict the rotation
-	bit	CURTILE		;  a = innsym(CURTILE);
-	bpl	loop5		;  switch (CURTILE >> 6) {
+	innsym			;    // depict the rotation
+	bit	CURTILE		;    a = innsym(CURTILE);
+	bpl	loop5		;    switch (CURTILE >> 6) {
 	bvc	loop4		;
 	
-	ldy	#$03		;  case 3: // 270 degrees clockwise (upward)
-	rot90cw	dy		;   a = rot90cw(a, 3);
+	ldy	#$03		;    case 3: // 270 degrees clockwise (upward)
+	rot90cw	dy		;     a = rot90cw(a, 3);
 	tay			;
-	lda	symchar,y	;   a = symchar[a];
-	sta 	SCREENM+XHAIRPV	;   SCREENM[XHAIRPV] = a; // pivot point
+	lda	symchar,y	;     a = symchar[a];
+	sta 	SCREENM+XHAIRPV	;     SCREENM[XHAIRPV] = a; // pivot point
 	lda	CURTILE		;
-	outsym			;   a = outsym(CURTILE);
+	outsym			;     a = outsym(CURTILE);
 	ldy	#$03		;
-	rot90cw	dy		;   a = rot90cw(a, 3);
+	rot90cw	dy		;     a = rot90cw(a, 3);
 	tay			;
-	lda	symchar,y	;   a = symchar[a];
-	sta	SCREENM+XHAIRUP	;   SCREENM[XHAIRUP] = a;
-	jmp	loop7		;   break;
+	lda	symchar,y	;     a = symchar[a];
+	sta	SCREENM+XHAIRUP	;     SCREENM[XHAIRUP] = a;
+	jmp	loop7		;     break;
 
-loop4	ldy	#$02		;  case 2: // 180 degrees clockwise (leftward)
-	rot90cw	dy		;   a = rot90cw(a, 2);
+loop4	ldy	#$02		;    case 2: // 180 degrees clockwise (leftward)
+	rot90cw	dy		;     a = rot90cw(a, 2);
 	tay			;
-	lda	symchar,y	;   a = symchar[a];
-	sta 	SCREENM+XHAIRPV	;   SCREENM[XHAIRPV] = a; // pivot point
+	lda	symchar,y	;     a = symchar[a];
+	sta 	SCREENM+XHAIRPV	;     SCREENM[XHAIRPV] = a; // pivot point
 	lda	CURTILE		;
-	outsym			;   a = outsym(CURTILE);
+	outsym			;     a = outsym(CURTILE);
 	ldy	#$02		;
-	rot90cw	dy		;   a = rot90cw(a, 2);
+	rot90cw	dy		;     a = rot90cw(a, 2);
 	tay			;
-	lda	symchar,y	;   a = symchar[a];
-	sta 	SCREENM+XHAIRLT	;   SCREENM[XHAIRLT] = a;
-	jmp	loop7		;   break;
+	lda	symchar,y	;     a = symchar[a];
+	sta 	SCREENM+XHAIRLT	;     SCREENM[XHAIRLT] = a;
+	jmp	loop7		;     break;
 	
-loop5	bvc	loop6		;  case 1: // 90 degrees clockwise (downward)
-	rot90cw			;   a = rot90cw(a, 1);
+loop5	bvc	loop6		;    case 1: // 90 degrees clockwise (downward)
+	rot90cw			;     a = rot90cw(a, 1);
 	tay			;
-	lda	symchar,y	;   a = symchar[a];
-	sta 	SCREENM+XHAIRPV	;   SCREENM[XHAIRPV] = a; // pivot point
+	lda	symchar,y	;     a = symchar[a];
+	sta 	SCREENM+XHAIRPV	;     SCREENM[XHAIRPV] = a; // pivot point
 	lda	CURTILE		;
-	outsym			;   a = outsym(CURTILE);
-	rot90cw			;   a = rot90cw(a, 1);
+	outsym			;     a = outsym(CURTILE);
+	rot90cw			;     a = rot90cw(a, 1);
 	tay			;
-	lda	symchar,y	;   a = symchar[a];
-	sta 	SCREENM+XHAIRDN	;   SCREENM[XHAIRDN] = a;
-	jmp	loop7		;   break;
+	lda	symchar,y	;     a = symchar[a];
+	sta 	SCREENM+XHAIRDN	;     SCREENM[XHAIRDN] = a;
+	jmp	loop7		;     break;
 
-loop6	and	#$0f		;  case 0: default: // unrotated (rightward)
+loop6	and	#$0f		;    case 0: default: // unrotated (rightward)
 	tay			;
-	lda	symchar,y	;   a = symchar[a & 0x0f];
-	sta	SCREENM+XHAIRPV	;   SCREENM[XHAIRPV] = a; // pivot point
+	lda	symchar,y	;     a = symchar[a & 0x0f];
+	sta	SCREENM+XHAIRPV	;     SCREENM[XHAIRPV] = a; // pivot point
 	lda	CURTILE		;
-	outsym			;   a = outsym(CURTILE);
+	outsym			;     a = outsym(CURTILE);
 	tay			;
-	lda	symchar,y	;   a = symchar[a];
-	sta	SCREENM+XHAIRRT	;   SCREENM[XHAIRRT] = a;
+	lda	symchar,y	;     a = symchar[a];
+	sta	SCREENM+XHAIRRT	;     SCREENM[XHAIRRT] = a;
 
-loop7	jsr	$ffe4		;  }
-	beq	loop7		;  while (1) {
-	and	#$df		;   a = getchar() & 0xdf;
+loop7	jsr	$ffe4		;    }
+	beq	loop7		;    for (;;) { // keyboard input loop
+	and	#$df		;     a = getchar() & 0xdf;
 
-	cmp	#$1d		;   if (a == 0x1d)
+	cmp	#$1d		;     if (a == 0x1d)
 	bne	+
- 	jmp	inright		;    inright();
-+	cmp	#$11		;   else if (a == 0x11)
+ 	jmp	inright		;      inright();
++	cmp	#$11		;     else if (a == 0x11)
 	bne	+
-	jmp	indown		;    indown();
-+	cmp	#$9d		;   else if (a == 0x9d)
+	jmp	indown		;      indown();
++	cmp	#$9d		;     else if (a == 0x9d)
 	bne	+
-	jmp	inleft		;    inleft();
-+	cmp	#$91		;   else if (a == 0x91)
+	jmp	inleft		;      inleft();
++	cmp	#$91		;     else if (a == 0x91)
 	bne	+
-	jmp	inup		;    inup();
+	jmp	inup		;      inup();
 +
 WASD	:?= 0
 .if WASD
-	cmp	#'d'		;   else if (a == 0x44)
+	cmp	#'d'		;     else if (a == 0x44)
 	bne	+
- 	jmp	inright		;    inright();
-+	cmp	#'s'		;   else if (a == 0x53)
+ 	jmp	inright		;      inright();
++	cmp	#'s'		;     else if (a == 0x53)
 	bne	+
-	jmp	indown		;    indown();
-+	cmp	#'a'		;   else if (a == 0x41)
+	jmp	indown		;      indown();
++	cmp	#'a'		;     else if (a == 0x41)
 	bne	+
-	jmp	inleft		;    inleft();
-+	cmp	#'w'		;   else if (a == 0x57)
+	jmp	inleft		;      inleft();
++	cmp	#'w'		;     else if (a == 0x57)
 	bne	+
-	jmp	inup		;    inup();
+	jmp	inup		;      inup();
 +
 .endif
 IJKL	:?= 0
 .if IJKL
-	cmp	#'l'		;   else if (a == 0x4c)
+	cmp	#'l'		;     else if (a == 0x4c)
 	bne 	+
-	jmp	inright		;    inright();
-+	cmp	#'k'		;   else if (a == 0x4b)
+	jmp	inright		;      inright();
++	cmp	#'k'		;     else if (a == 0x4b)
 	bne	+
-	jmp	indown		;    indown();
-+	cmp	#'j'		;   else if (a == 0x4a)
+	jmp	indown		;      indown();
++	cmp	#'j'		;     else if (a == 0x4a)
 	bne	+
-	jmp	inleft		;    inleft();
-+	cmp	#'i'		;   else if (a == 0x49)
+	jmp	inleft		;      inleft();
++	cmp	#'i'		;     else if (a == 0x49)
 	bne	+
-	jmp	inup		;    inup();
+	jmp	inup		;      inup();
 +
 .endif
-	cmp	#0		;  if (a == ' ' & 0xdf)
+	cmp	#0		;     else if (a == ' ' & 0xdf)
 	bne	loopq		;
-	jmp	loop2		;   goto loop2;
+	jmp	loop2		;      break; // rotate cw through all 4 options
 
 loopq	cmp	#$0d		;
 	beq	place		;
 	cmp	#'q'		;
-	bne	loop7		;  else if (a == 'q' || a == 'Q')
-	rts			;   return;
+	bne	loop7		;    else if (a == 'q' || a == 'Q')
+	rts			;     return;
 	
-place	jsr	stampit		;  else if  (a == '\r')
-	jmp	loop		;   stampit(); //copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#
+place	jsr	stampit		;    else if  (a == '\r')
+	jmp	loop		;     stampit(); //copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#
+				;   } // keyboard input loop
+				;  } // next rotation
+				; } // next tile
+				;} // main()
 
 liftile	.macro			;inline void liftile(void) {
 	lda	PBACKUP		; // could reduce code and redraw just the two obscured characters instead of all five (faster? slower?)
