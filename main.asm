@@ -408,6 +408,7 @@ loop	lda	RNDLOC1		;
 	and	#$3f		;
 	sta	CURTILE		; CURTILE = rand() & 0x3f;
 
+	sec			;
 loop1	lda	SCREENM+XHAIRPV	;
 	sta	PBACKUP		; PBACKUP = SCREENM[XHAIRPV];
 	lda	SCREENM+XHAIRLT	;
@@ -421,6 +422,11 @@ loop1	lda	SCREENM+XHAIRPV	;
 
 	lda	XHAIRC		;
 	sta	SCREENC+XHAIRPV	; SCREENC[XHAIRPV] = XHAIRC;
+	bcs	loop2		;
+	
+	lda	#$c0		;
+	adc	CURTILE		;
+	sta	CURTILE		;
 
 loop2	bit	CURTILE		; loop2: // perform the rotation (repair outer char)
 	bpl	loopb		;
@@ -727,7 +733,7 @@ blitter	.macro	src,dst,ends	;
 +
 .elsif \src > \dst
 	lda	# <\src		;void blitter(uint8_t* src, uint8_t* dst,
-	sta	(+)-2		;             uint8_t* ends) { // what was opt?
+	sta	(+)-2		;             uint8_t* ends) {
 	lda	# >\src		;
 	sta	(+)-1		;
 	lda	# <\dst		;
@@ -747,7 +753,8 @@ blitter	.macro	src,dst,ends	;
 	bne	-		;----+ |                          // usually +3T
 	inc	(-)+5		;    | |
 	bne	-		;----+ |                          // =34T
-+	cmp	# >\ends	;<-----+
++	lda	(-)+2		;<-----+
+	cmp	# >\ends	;
 	beq	++		;->.endm
  	inc	(-)+1		;    ^
 	bne	+		;--+ |
@@ -770,8 +777,8 @@ inright	movptrs	+1		;void inright(void) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(STL+1,STL,SBR);
 	blitter	STL+1,STL,SBR	;  repaint(-SCREENW/2,-1);
-; brk
 	repaint	-SCREENW/2,-1	;  goto loop1; }
+	clc			;
 	jmp	loop1		;} // inright()
 	
 indown	movptrs	+FDIM		;void indown(void) {
@@ -779,17 +786,17 @@ indown	movptrs	+FDIM		;void indown(void) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(STL1D,STL,SBR);
 	blitter	STL1D,STL,SBR	;  repaint(-1,-SCREENH/2-1);
-; brk
 	repaint	-1,-SCREENH/2-1	;  goto loop1; }
+	clc			;
 	jmp	loop1		;} // indown()
 	
 inleft	movptrs	-1		;void inleft(void) {
 	bcs	+		; if (movptrs(-1) == 0) {
 	jmp	loop7		;  liftile();
-+	liftile			;  blitter(SBR-1,SBR,STL,-1)
-	blitter	SBR-1,SBR,STL	;  repaint(+SCREENW/2-1);
-; brk
++	liftile			;  blitter(SBR-1,SBR,STL)
+	blitter	SBR-1,SBR,STL	;  repaint(+SCREENW/2-1,-1
 	repaint	+SCREENW/2-1,-1	;  goto loop1; }
+	clc			;
 	jmp	loop1		;} // inleft()
 	
 inup	movptrs	-FDIM		;void inup(void)
@@ -797,8 +804,8 @@ inup	movptrs	-FDIM		;void inup(void)
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(SBR1U,SBR,STL)
 	blitter	SBR1U,SBR,STL	;  repaint(-1,SCREENH/2);
-; brk
 	repaint	-1,SCREENH/2	;  goto loop1; }
+	clc			;
 	jmp	loop1		;} // inup()
 	
 angle	.macro			;inline uint2_t angle(uint8_t a) {
