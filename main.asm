@@ -1,8 +1,17 @@
 *	= BASIC+1
 	.word	(+), 2055
-	.null	$99, $22, $13, "petscido", $22, $3a, $9e, format("%4d", start)
+	.text	$99, $22, $8e, $08, $13
+topline	.text	"jailbrk 1="
+toplin1	.text	"?  2="
+toplin2	.text	"?  3="
+toplin3	.text	"?", $22
+	.null	$3a, $9e, format("%4d", start)
 +	.word 0
 start	jmp	main
+	
+TILE1AT	= toplin1-topline
+TILE2AT	= toplin2-topline
+TILE3AT	= toplin3-topline
 	
 FDIM	= 1<<FIELDPW		;
 FIELDSZ	= FDIM*FDIM		;
@@ -86,7 +95,6 @@ rot90cw	.macro	decrement=0
 .endif
 	.endm			;} // rot90cw()
 	
-DECKREM	.text	pstdeck-deck
 deck
 PETSCIDA :?= 1;;; FIXME :?= 0 after default deck no longer all zeroes
 .if PETSCIDA
@@ -113,6 +121,31 @@ PETSCIDA :?= 1;;; FIXME :?= 0 after default deck no longer all zeroes
 	.text	0,0,0,0,0,0,0
 .endif
 pstdeck
+DECKSIZ	= pstdeck-deck
+.if 0	
+.if DECKSIZ > $80
+DECKMSK	= $ff			;
+.elsif DECKSIZ > $40
+DECKMSK	= $7f
+.elsif DECKSIZ > $20
+DECKMSK	= $3f
+.elsif DECKSIZ > $10
+DECKMSK	= $1f
+.elsif DECKSIZ > $08
+DECKMSK	= $0f
+.elsif DECKSIZ > $04
+DECKMSK	= $07
+.elsif DECKSIZ > $02
+DECKMSK	= $03
+.elsif DECKSIZ > $01
+DECKMSK	= $01
+.elsif DECKSIZ > $00
+DECKMSK	= $00
+.else
+error "Deck has no initial cards"
+.endif
+.endif
+DECKREM	.byte	0
 	
 ;;;    2^1 2^3
 ;;; 2^0       2^5
@@ -358,7 +391,14 @@ chckptr	.macro	delta		;
 	dey
 	bne -
 	
-main	lda	#<SBR1U		;void main(void) {
+SEEDVAL	:?= 0
+SEEDLOC	:?= 0
+	
+main	lda	#SEEDVAL	;void main(void) {
+.if SEEDLOC
+	sta	SEEDLOC		; *SEEDLOC = SEEDVAL;
+.endif	
+	lda	#<SBR1U		;
 	sta	POINTER		;
 	lda	#>SBR1U		;
 	sta	1+POINTER	; POINTER = SBR1U; // one less than BL corner
@@ -368,10 +408,40 @@ main	lda	#<SBR1U		;void main(void) {
 	sta	1+POINTR2	; POINTR2 = SBR1U+(SCREENC-SCREENM); // colormem
 	ldx	#SCREENH-1	; for (uint8_t x = SCREENH; x; x--) {
 main1	ldy	#SCREENW	;  for (uint8_t y = SCREENW; y; y--) {
-main2	lda	#$20		;
-	sta	(POINTER),y	;   POINTER[y] = 0xa0; // solid dirt
-	lda	FIELDC		;
+main2	lda	FIELDC		;
 	sta	(POINTR2),y	;   POINTR2[y] = FIELDC; // dirt color
+	lda	#$1f		;
+	sta	(POINTER),y	;   POINTER[y] = 0xa0; // progress arrow
+	
+	txa			;
+	pha			;
+	tya			;
+	pha			;
+	lda	RNDLOC1		;   for (x = (*RNDLOC1 ^ *RNDLOC2) >> 1;
+	eor	RNDLOC2		;        x >= *DECKSIZ;
+-	lsr			;        x >>= 1)
+	cmp	#DECKSIZ	;
+	bcs	-		;    ;
+	tax			;
+main4	lda	RNDLOC1		;   for (y = (*RNDLOC1 ^ *RNDLOC2) >> 1;
+	eor	RNDLOC2		;        y >= *DECKSIZ;
+-	lsr			;        y >>= 1)
+	cmp	#DECKSIZ	;
+	bcs	-		;    ;
+	tay			;
+	lda	deck,x		;
+	pha			;   uint8_t temp = deck[x];
+	lda	deck,y		;
+	sta	deck,x		;   deck[x] = deck[y];
+	pla			;
+	sta	deck,y		;   deck[y] = temp;
+	pla			;
+	tay			;
+	pla			;
+	tax			;
+
+	lda	#$20		;
+	sta	(POINTER),y	;   POINTER[y] = 0xa0; // unremoved dirt
 	dey			;
 	bne	main2		;  }
 	sec			;
@@ -443,6 +513,9 @@ selfmod	sta	FIELDMX		;
 	lda	FIELDC		;
 	sta	SCREENC+XHAIRLT	; SCREENC[XHAIRLT] = FIELDC; // now visible
 	
+	lda	#DECKSIZ	;
+	sta	DECKREM		; DECKREM = DECKSIZ;
+
 loop	ldy	DECKREM		; for (;;) { // place a new current tile
 	bne	+		;  if (DECKREM == 0)
 	rts			;   return; // deck exhausted without winning
@@ -823,10 +896,10 @@ blitter	.macro	src,dst,ends	;
 	bne	-		;----+ |                          // usually +3T
 	inc	(-)+5		;    | |
 	bne	-		;----+ |                          // =34T
-+	lda	(-)+2		;<-----+
-	cmp	# >\ends	;
++	lda	(-)+2		;<---|--+
+	cmp	# >\ends	;    |
 	beq	++		;->.endm
- 	inc	(-)+1		;    ^
+ 	inc	(-)+1		;    |
 	bne	+		;--+ |
 	inc	(-)+2		;  | |
 +	inc	(-)+4		;<-+ |
