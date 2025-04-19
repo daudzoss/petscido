@@ -1,7 +1,7 @@
 *	= BASIC+1
 	.word	(+), 2055
 	.text	$99, $22, $8e, $08, $13
-topline	.text	"jailbrk 1="
+topline	.text	"?? left 1="
 toplin1	.text	"?  2="
 toplin2	.text	"?  3="
 toplin3	.text	"?", $22
@@ -532,33 +532,32 @@ selfmod	sta	FIELDMX		;
 	sta	CURTNUM		; CURTNUM = 1; // or 2 or 3
 
 loop	ldy	DECKREM		; for (;;) { // place a new current tile
-	bne	+		;  if (DECKREM == 0)
--	rts			;   return; // deck gone; FIXME: still 3 moves!
-+	dey			;
+	beq	+		;  if (DECKREM != 0)
+	dey			;
 	sty	DECKREM		;
 	lda	deck,y		;
 	ldy	CURTNUM		;
-	;cpy	#4		;  if (CURTNUM > 4)
-	;bcs	-		;   return; // catastrophic error
-	sta	CURTILE,y	;
-	sta	CURTILE		;  CURTILE[0] = CURTILE[CURTNUM] = deck[--DECKREM];
+	sta	CURTILE		;   CURTILE[0] =
+	sta	CURTILE,y	;            CURTILE[CURTNUM] = deck[--DECKREM];
 
-	ldx	#3		;
--	lda	CURTILE,x	;
++	ldx	#3		;  for (uint8_t x = 3; x; x--) {
+-	lda	CURTILE,x	;   uint8_t a;
 	innsym			;
 	tay			;
-	lda	symchar,y	;
+	lda	symchar,y	;   a = symchar[innsym(CURTILE[x])]; // left
 	ldy	TILESAT,x	;
-	sta	SCREENM,y	;
+	sta	SCREENM,y	;   SCREENM[TILESAT[x]] = a; // on the screen
 	lda	CURTILE,x	;
 	outsym			;
 	tay			;
-	lda	symchar,y	;
+	lda	symchar,y	;   a = symchar[outsym(CURTILE[x])]; // right
 	ldy	TILESAT,x	;
 	iny			;
-	sta	SCREENM,y	;
+	sta	SCREENM,y	;   SCREENM[TILESAT[x]+1] = a; // on the screen
 	dex			;
-	bne	-		;
+	bne	-		;  }
+
+	jsr	numleft		;  numleft();
 
 	sec			;  for (uint1_t c = 1; ; c = 0) { // new position
 loop1	lda	SCREENM+XHAIRPV	;
@@ -1051,7 +1050,93 @@ nostamp	rts			;}
 	
 .endif	
 
+numleft	lda	DECKREM		;
+	ldy	#10
+	cmp	#100
+	bcc	*+3
+	brk
 
+	dey
+	cmp	#90
+	bcc	*+7
+	sec
+	sbc	#90
+	bcs	*+2+90
+
+	dey
+	cmp	#80
+	bcc	*+7
+	sec
+	sbc	#80
+	bcs	*+2+80
+
+	dey
+	cmp	#70
+	bcc	*+7
+	sec
+	sbc	#70
+	bcs	*+2+70
+
+	dey
+	cmp	#60
+	bcc	*+7
+	sec
+	sbc	#60
+	bcs	*+2+60
+
+	dey
+	cmp	#50
+	bcc	*+7
+	sec
+	sbc	#50
+	bcs	*+2+50
+
+	dey
+	cmp	#40
+	bcc	*+7
+	sec
+	sbc	#40
+	bcs	*+2+40
+
+	dey
+	cmp	#30
+	bcc	*+7
+	sec
+	sbc	#30
+	bcs	*+2+30
+
+	dey
+	cmp	#20
+	bcc	*+7
+	sec
+	sbc	#20
+	bcs	*+2+20
+
+	dey
+	cmp	#10
+	bcc	*+7
+	sec
+	sbc	#10
+	bcs	*+2+10
+
+	dey
+	cmp	#0
+	bcc	*+7
+	sec
+	sbc	#0
+	bcs	*+2+0
+
+	pha
+	tya
+	bne	+
+	lda	#' '
+	bne	++
++	ora	#$30
++	sta	SCREENM
+	pla
+	ora	#$30
+	sta	SCREENM+1
+	rts
 
 
 
