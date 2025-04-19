@@ -533,7 +533,7 @@ selfmod	sta	FIELDMX		;
 
 loop	ldy	DECKREM		; for (;;) { // place a new current tile
 	bne	+		;  if (DECKREM == 0)
--	rts			;   return; // deck exhausted without winning
+-	rts			;   return; // deck gone; FIXME: still 3 moves!
 +	dey			;
 	sty	DECKREM		;
 	lda	deck,y		;
@@ -673,10 +673,23 @@ loop6	and	#$0f		;    case 0: default: // unrotated (rightward)
 	sta	SCREENM+XHAIRRT	;     SCREENM[XHAIRRT] = a;
 
 loop7	jsr	$ffe4		;    }
-	beq	loop7		;    for (;;) { // keyboard input loop
-	and	#$df		;     a = getchar() & 0xdf;
+	beq	loop7		;    while ((a = getchar()) { // keyboard input loop
 
-	cmp	#$1d		;     if (a == 0x1d)
+	cmp	#'1'		;
+	beq	+		;
+	cmp	#'2'		;
+	beq	+		;
+	cmp	#'3'		;
+	bne	++		;     if (a == 0x31 || a == 0x32 || a == 0x33) {
++	and	#$0f		;
+	tay			;      a = CURTILE[a & 0x03];
+	lda	CURTILE,y	;      if (a == 0) // last few tiles, some blank
+	beq	+		;       continue;
+	sta	CURTILE		;      CURTILE[0] = a;
+	jmp	cychair		;      goto cychair;
+	
++	and	#$df		;     }
+	cmp	#$1d		;     if ((a &= 0xdf) == 0x1d)
 	bne	+
  	jmp	inright		;      inright();
 +	cmp	#$11		;     else if (a == 0x11)
