@@ -1,6 +1,6 @@
 *	= BASIC+1
 	.word	(+), 2055
-	.null	$99, $22, $93, "petscido", $22, $3a, $9e, format("%4d", start)
+	.null	$99, $22, $13, "petscido", $22, $3a, $9e, format("%4d", start)
 +	.word 0
 start	jmp	main
 	
@@ -15,10 +15,10 @@ XHAIRRT	= XHAIRPV+1		; the initial unplaced tile position, w/ XHAIRPV
 XHAIRUP = XHAIRPV-SCREENW	;
 XHAIRDN	= XHAIRPV+SCREENW	;
 	
+STL	= SCREENM+SCREENW	; top-left corner (title/tile line is abovee it)
+STL1D	= SCREENM+2*SCREENW	; down 1 row from top-left corner
 SBR1U	= SCREENM+SCREENW*(SCREENH-1)-1 ; up 1 row from screen bottom-right corner
 SBR	= SCREENM+SCREENW*(SCREENH-0)-1 ; screen bottom-right corner
-STL1D	= SCREENM+2*SCREENW	; down 1 row from top-left corner
-STL	= SCREENM+SCREENW	; top-left corner (title/tile line is abovee it)
 	
 POINTER = ZP			; static void* POINTER;
 POINTR2 = ZP+2			; static void* POINTR2;
@@ -351,12 +351,45 @@ chckptr	.macro	delta		;
 	sta	1+POINTER	; POINTER = POINTR2 + delta;
 	.endm
 	
-main	lda FIELDC		;void main(void) {
+	lda FIELDC		;void main(void) {
 	ldy #$e2
 -	sta SCREENC+SCREENW-1,y
 	sta SCREENC+SCREENW-1+$e2,y ; FIXME: harmless? workaround (for vic20 screen not having color already set)
 	dey
 	bne -
+	
+main	lda	#<SBR1U		;void main(void) {
+	sta	POINTER		;
+	lda	#>SBR1U		;
+	sta	1+POINTER	; POINTER = SBR1U; // one less than BL corner
+	lda	#<(SBR1U-SCREENM+SCREENC)
+	sta	POINTR2		;
+	lda	#>(SBR1U-SCREENM+SCREENC)
+	sta	1+POINTR2	; POINTR2 = SBR1U+(SCREENC-SCREENM); // colormem
+	ldx	#SCREENH-1	; for (uint8_t x = SCREENH; x; x--) {
+main1	ldy	#SCREENW	;  for (uint8_t y = SCREENW; y; y--) {
+main2	lda	#$20		;
+	sta	(POINTER),y	;   POINTER[y] = 0xa0; // solid dirt
+	lda	FIELDC		;
+	sta	(POINTR2),y	;   POINTR2[y] = FIELDC; // dirt color
+	dey			;
+	bne	main2		;  }
+	sec			;
+	lda	POINTER		;
+	sbc	#SCREENW	;
+	sta	POINTER		;
+	lda	1+POINTER	;
+	sbc	#0		;
+	sta	1+POINTER	;  POINTER -= SCREENW;
+	sec			;
+	lda	POINTR2		;
+	sbc	#SCREENW	;
+	sta	POINTR2		;
+	lda	1+POINTR2	;
+	sbc	#0		;
+	sta	1+POINTR2	;  POINTR2 -= SCREENW;
+	dex			;
+	bne	main1		; }
 	lda	# <FIELDMX
 	sta	selfmod+1	; uint8_t a;
 	lda	# >FIELDMX	;
