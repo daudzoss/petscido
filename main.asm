@@ -1,6 +1,6 @@
 *	= BASIC+1
 	.word	(+), 2055
-	.null	$9e, format("%4d", start)
+	.null	$99, $22, $93, "petscido", $22, $3a, $9e, format("%4d", start)
 +	.word 0
 start	jmp	main
 	
@@ -15,7 +15,6 @@ XHAIRRT	= XHAIRPV+1		; the initial unplaced tile position, w/ XHAIRPV
 XHAIRUP = XHAIRPV-SCREENW	;
 XHAIRDN	= XHAIRPV+SCREENW	;
 	
-STR
 SBR1U	= SCREENM+SCREENW*(SCREENH-1)-1 ; up 1 row from screen bottom-right corner
 SBR	= SCREENM+SCREENW*(SCREENH-0)-1 ; screen bottom-right corner
 STL1D	= SCREENM+2*SCREENW	; down 1 row from top-left corner
@@ -352,7 +351,7 @@ chckptr	.macro	delta		;
 	sta	1+POINTER	; POINTER = POINTR2 + delta;
 	.endm
 	
-main	lda	#$93		;void main(void) {
+_main	lda	#$93		;
 	jsr	$ffd2		; putchar(0x93); // clear screen
  lda FIELDC
  ldy #$fa
@@ -360,8 +359,8 @@ main	lda	#$93		;void main(void) {
  sta SCREENC-1+$fa,y ; FIXME: harmless workaround (for vic20 screen not having color already set?)
  dey
  bne -
-	lda	# <FIELDMX	; uint8_t a;
-	sta	selfmod+1	;
+main	lda	# <FIELDMX	;void main(void) {
+	sta	selfmod+1	; uint8_t a;
 	lda	# >FIELDMX	;
 	sta	selfmod+2	;
 	lda	#$00		;
