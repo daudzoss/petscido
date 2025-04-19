@@ -40,7 +40,7 @@ UBACKUP	.byte	$20		; static uint8_t UBACKUP = ' ';
 DBACKUP	.byte	$20		; static uint8_t DBACKUP = ' ';
 	
 FIELDC	.byte	$0		; black
-XHAIRC	.byte	$2		; orange
+XHAIRC	.byte	$62		; orange
 	
 ;;;    2^3
 ;;; 2^2   2^0
@@ -428,7 +428,7 @@ loop1	lda	SCREENM+XHAIRPV	;
 	lda	SCREENM+XHAIRDN	;
 	sta	DBACKUP		;   DBACKUP = SCREENM[XHAIRDN];
 
-	lda	XHAIRC		;
+cychair	lda	XHAIRC		;
 	sta	SCREENC+XHAIRPV	;   SCREENC[XHAIRPV] = XHAIRC;
 	bcs	loop2		;
 	
@@ -461,10 +461,10 @@ loopb	bvc	loopc		;
 	lda	XHAIRC		;
 	sta	SCREENC+XHAIRLT	;     SCREENC[XHAIRLT] = XHAIRC;
 	jmp	loopd		;     break;
-loopc	lda	RBACKUP		;    case 2: // rotate from right (0) to down (1)
+loopc	lda	RBACKUP		;    case 0: // rotate from right (0) to down (1)
 	sta	SCREENM+XHAIRRT	;     SCREENM[XHAIRRT] = LBACKUP;
 	lda	FIELDC		;
-	sta	SCREENC+XHAIRRT	;     SCREENC[XHAIRLT] = FIELDC;
+	sta	SCREENC+XHAIRRT	;     SCREENC[XHAIRRT] = FIELDC;
 	lda	XHAIRC		;
 	sta	SCREENC+XHAIRDN	;     SCREENC[XHAIRDN] = XHAIRC;
 loopd	lda	CURTILE		;    }
@@ -578,24 +578,44 @@ IJKL	:?= 0
 +
 .endif
 	cmp	#0		;     else if (a == ' ' & 0xdf)
-	bne	loopq		;
+	bne	+		;
 	jmp	loop2		;      break; // rotate cw through all 4 options
 
-loopq	cmp	#$0d		;
-	beq	place		;
++	cmp	#$0d		;
+	bne	+		;    else if (a == '\r') {
+	jsr	stampit		;     stampit(); //copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#
+	jmp	loop		;     goto loop;
+	
++	cmp	#'f'		;
+	bne	+		;    else if (a == 0x46) {
+	lda	XHAIRC		;
+	clc			;
+	adc	#1		;
+	and	#$0f		;     a = (XHAIRC + 1) & 0x0f; // cycle color
+	pha			;
+	lda	XHAIRC		;
+	and	#$f0		;
+	sta	XHAIRC		;     XHAIRC &= 0xf0; // keep any luminance bits
+	pla			;
+	ora	XHAIRC		;
+	sta	XHAIRC		;     XHAIRC |= a; // write back
+	jmp	cychair		;
+
++	cmp	#'b'		;    // switch video chip background/border colors?
+	
 	cmp	#'q'		;
-	bne	loop7		;    else if (a == 'q' || a == 'Q')
+	bne	loop7		;    } else if (a == 'q' || a == 'Q')
 	rts			;     return;
 	
-place	jsr	stampit		;    else if  (a == '\r')
-	jmp	loop		;     stampit(); //copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#
+place	jsr	stampit		;
+	jmp	loop		;
 				;   } // keyboard input loop
 				;  } // next rotation
 				; } // next tile
 				;} // main()
 
 liftile	.macro			;inline void liftile(void) {
-	lda	PBACKUP		; // could reduce code and redraw just the two obscured characters instead of all five (faster? slower?)
+	lda	PBACKUP		; // could reduce code and redraw just the two obscured character positionss instead of all five (faster? slower?)
 	sta	SCREENM+XHAIRPV	; SCREENM[XHAIRPV] = PBACKUP;
 	lda	LBACKUP		;
 	sta	SCREENM+XHAIRLT	; SCREENM[XHAIRLT] = LBACKUP;
@@ -605,6 +625,12 @@ liftile	.macro			;inline void liftile(void) {
 	sta	SCREENM+XHAIRUP	; SCREENM[XHAIRUP] = UBACKUP;
 	lda	DBACKUP		;
 	sta	SCREENM+XHAIRDN	; SCREENM[XHAIRDN] = DBACKUP;
+	lda	FIELDC		; // could reduce code and redraw just the two obscured character positionss instead of all five (faster? slower?)
+	sta	SCREENC+XHAIRPV	; SCREENC[XHAIRPV] = FIELDC;
+	sta	SCREENC+XHAIRLT	; SCREENC[XHAIRLT] = FIELDC;
+	sta	SCREENC+XHAIRRT	; SCREENC[XHAIRRT] = FIELDC;
+	sta	SCREENC+XHAIRUP	; SCREENC[XHAIRUP] = FIELDC;
+	sta	SCREENC+XHAIRDN	; SCREENC[XHAIRDN] = FIELDC;
 	.endm			;} // liftile()
 
 movptrs	.macro	delta		;inline uint1_t movptrs(const int8_t delta) { // FIXME: these waste an enormous moat merely by insisting no non-field squares appear onscreen
