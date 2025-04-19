@@ -9,9 +9,10 @@ toplin3	.text	"?", $22
 +	.word 0
 start	jmp	main
 	
-TILE1AT	= toplin1-topline
-TILE2AT	= toplin2-topline
-TILE3AT	= toplin3-topline
+TILESAT	.byte 0 ; ignored
+TILE1AT	.byte toplin1-topline
+TILE2AT	.byte toplin2-topline
+TILE3AT	.byte toplin3-topline
 	
 FDIM	= 1<<FIELDPW		;
 FIELDSZ	= FDIM*FDIM		;
@@ -33,7 +34,12 @@ POINTER = ZP			; static void* POINTER;
 POINTR2 = ZP+2			; static void* POINTR2;
 ZP_TEMP	= ZP+4			; static uint8_t ZP_TEMP;
 	
-CURTILE	.byte	0		; static uint8_t CURTILE; //undefined
+CURTILE	.byte	0		; static uint8_t CURTILE[4]; // shown and 2 more
+CURTIL1	.byte	0		;
+CURTIL2	.byte	0		;
+CURTIL3	.byte	0		;
+CURTNUM	.byte	0		; static uint2_t CURTNUM;
+	
 XFLDOFS	.byte	FDIM/2		; static uint8_t XFLDOFS = FDIM/2;
 YFLDOFS	.byte	FDIM/2		; static uint8_t YFLDOFS;
 ROTNOFS .byte	FDIM+1		; static const ROTNOFS[] = {FDIM+1,
@@ -513,16 +519,46 @@ selfmod	sta	FIELDMX		;
 	lda	FIELDC		;
 	sta	SCREENC+XHAIRLT	; SCREENC[XHAIRLT] = FIELDC; // now visible
 	
-	lda	#DECKSIZ	;
-	sta	DECKREM		; DECKREM = DECKSIZ;
+	ldy	#DECKSIZ	;
+	dey			;
+	;sty	DECKREM		;
+	lda	deck,y		;
+	sta	CURTIL3		; CURTILE[3] = deck[--DECKREM];
+	dey			;
+	sty	DECKREM		;
+	lda	deck,y		;
+	sta	CURTIL2		; CURTILE[2] = deck[--DECKREM];
+	lda	#1		;
+	sta	CURTNUM		; CURTNUM = 1; // or 2 or 3
 
 loop	ldy	DECKREM		; for (;;) { // place a new current tile
 	bne	+		;  if (DECKREM == 0)
-	rts			;   return; // deck exhausted without winning
+-	rts			;   return; // deck exhausted without winning
 +	dey			;
-	lda	deck,y		;
 	sty	DECKREM		;
-	sta	CURTILE		;  CURTILE = deck[--DECKREM];
+	lda	deck,y		;
+	ldy	CURTNUM		;
+	;cpy	#4		;  if (CURTNUM > 4)
+	;bcs	-		;   return; // catastrophic error
+	sta	CURTILE,y	;
+	sta	CURTILE		;  CURTILE[0] = CURTILE[CURTNUM] = deck[--DECKREM];
+
+	ldx	#3		;
+-	lda	CURTILE,x	;
+	innsym			;
+	tay			;
+	lda	symchar,y	;
+	ldy	TILESAT,x	;
+	sta	SCREENM,y	;
+	lda	CURTILE,x	;
+	outsym			;
+	tay			;
+	lda	symchar,y	;
+	ldy	TILESAT,x	;
+	iny			;
+	sta	SCREENM,y	;
+	dex			;
+	bne	-		;
 
 	sec			;  for (uint1_t c = 1; ; c = 0) { // new position
 loop1	lda	SCREENM+XHAIRPV	;
@@ -542,11 +578,11 @@ cychair	lda	XHAIRC		;
 	
 	lda	#$c0		;   // we're in a new position and in order to
 	adc	CURTILE		;   // keep the original rotation we need to
-	sta	CURTILE		;   CURTILE += 0xc0; // rotate ccw before cw:
+	sta	CURTILE		;   CURTILE[0] += 0xc0; // rotate ccw before cw:
 
 loop2	bit	CURTILE		;   for (;;) { // new rot'n (repair outer char)
 	bpl	loopb		;
-	bvc	loopa		;    switch (CURTILE >> 6) {
+	bvc	loopa		;    switch (CURTILE[0] >> 6) {
 	lda	UBACKUP		;    case 3: // rotate from up (3) to right (0)
 	sta	SCREENM+XHAIRUP	;     SCREENM[XHAIRUP] = UBACKUP;
 	lda	FIELDC		;
@@ -578,11 +614,11 @@ loopc	lda	RBACKUP		;    case 0: // rotate from right (0) to down (1)
 loopd	lda	CURTILE		;    }
 	clc			;
 	adc	#$40		;
-	sta	CURTILE		;    CURTILE += (1 << 6);
+	sta	CURTILE		;    CURTILE[0] += (1 << 6);
 	
 	innsym			;    // depict the rotation
-	bit	CURTILE		;    a = innsym(CURTILE);
-	bpl	loop5		;    switch (CURTILE >> 6) {
+	bit	CURTILE		;    a = innsym(CURTILE[0]);
+	bpl	loop5		;    switch (CURTILE[0] >> 6) {
 	bvc	loop4		;
 	
 	ldy	#$03		;    case 3: // 270 degrees clockwise (upward)
@@ -591,7 +627,7 @@ loopd	lda	CURTILE		;    }
 	lda	symchar,y	;     a = symchar[a];
 	sta 	SCREENM+XHAIRPV	;     SCREENM[XHAIRPV] = a; // pivot point
 	lda	CURTILE		;
-	outsym			;     a = outsym(CURTILE);
+	outsym			;     a = outsym(CURTILE[0]);
 	ldy	#$03		;
 	rot90cw	dy		;     a = rot90cw(a, 3);
 	tay			;
@@ -605,7 +641,7 @@ loop4	ldy	#$02		;    case 2: // 180 degrees clockwise (leftward)
 	lda	symchar,y	;     a = symchar[a];
 	sta 	SCREENM+XHAIRPV	;     SCREENM[XHAIRPV] = a; // pivot point
 	lda	CURTILE		;
-	outsym			;     a = outsym(CURTILE);
+	outsym			;     a = outsym(CURTILE[0]);
 	ldy	#$02		;
 	rot90cw	dy		;     a = rot90cw(a, 2);
 	tay			;
@@ -619,7 +655,7 @@ loop5	bvc	loop6		;    case 1: // 90 degrees clockwise (downward)
 	lda	symchar,y	;     a = symchar[a];
 	sta 	SCREENM+XHAIRPV	;     SCREENM[XHAIRPV] = a; // pivot point
 	lda	CURTILE		;
-	outsym			;     a = outsym(CURTILE);
+	outsym			;     a = outsym(CURTILE[0]);
 	rot90cw			;     a = rot90cw(a, 1);
 	tay			;
 	lda	symchar,y	;     a = symchar[a];
@@ -631,7 +667,7 @@ loop6	and	#$0f		;    case 0: default: // unrotated (rightward)
 	lda	symchar,y	;     a = symchar[a & 0x0f];
 	sta	SCREENM+XHAIRPV	;     SCREENM[XHAIRPV] = a; // pivot point
 	lda	CURTILE		;
-	outsym			;     a = outsym(CURTILE);
+	outsym			;     a = outsym(CURTILE[0]);
 	tay			;
 	lda	symchar,y	;     a = symchar[a];
 	sta	SCREENM+XHAIRRT	;     SCREENM[XHAIRRT] = a;
@@ -963,13 +999,13 @@ tofield	.macro			;inline uint8_t tofield(uint1_t out,
 	.if \1			;                       register uint8_t* y) {
 	outsym			;
 	.else			; uint8_t a;
-	innsym			; a = out ? outsym(CURTILE) : innsym(CURTILE);
+	innsym			; a = out ? outsym(CURTILE[0]) : innsym(CURTILE[0]);
 	.endif			;
 	copynyb			; a = copynyb(a&0x0f); // un-closed-off flags
 	tay			;
 	lda	CURTILE		;
 	angle			;
-	tax			; x = CURTILE >> 6; // rotation bits only
+	tax			; x = CURTILE[0] >> 6; // rotation bits only
 	tya			;
 	.if	\1		; if (out)
 	ldy	ROTNOFS,x	;  y = ROTNOFS[x]; // +1 in x, +1 in y, -1 in x, -1 in y
@@ -982,7 +1018,7 @@ tofield	.macro			;inline uint8_t tofield(uint1_t out,
 	.endm			;}
 	
 stampit	lda	CURTILE		;uint8_t stampit(uint8_t a) {
-	beq	nostamp		; if ((CURTILE = a) != 0) // tile not blank
+	beq	nostamp		; if ((CURTILE[0] = a) != 0) // tile not blank
 	tofield	0		;
 	bne	nostamp		;  if (tofield(0 /*inner*/, a, &x, &y) == 0) {
 	txa			;
@@ -994,7 +1030,7 @@ stampit	lda	CURTILE		;uint8_t stampit(uint8_t a) {
 	pla			;
 	ldy	#FDIM		;
 	sta	(POINTR2),y	;    POINTR2[FDIM] = stack;
-	lda	CURTILE		;    return CURTILE;
+	lda	CURTILE		;    return CURTILE[0];
 	rts			;   }
 +	pla			;  }
 	lda	#0		; return 0;
