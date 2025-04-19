@@ -351,15 +351,13 @@ chckptr	.macro	delta		;
 	sta	1+POINTER	; POINTER = POINTR2 + delta;
 	.endm
 	
-_main	lda	#$93		;
-	jsr	$ffd2		; putchar(0x93); // clear screen
- lda FIELDC
- ldy #$fa
-- sta SCREENC-1,y
- sta SCREENC-1+$fa,y ; FIXME: harmless workaround (for vic20 screen not having color already set?)
- dey
- bne -
-main	lda	# <FIELDMX	;void main(void) {
+main	lda FIELDC		;void main(void) {
+	ldy #$e2
+-	sta SCREENC+SCREENW-1,y
+	sta SCREENC+SCREENW-1+$e2,y ; FIXME: harmless? workaround (for vic20 screen not having color already set)
+	dey
+	bne -
+	lda	# <FIELDMX
 	sta	selfmod+1	; uint8_t a;
 	lda	# >FIELDMX	;
 	sta	selfmod+2	;
@@ -397,6 +395,8 @@ selfmod	sta	FIELDMX		;
 	tay			;
 	lda	symchar,y	; a = symchar[a & 0x0f];
 	sta   SCREENM+XHAIRLT-1	; SCREENM[XHAIRLT-1] = a;
+	lda	FIELDC		;
+	sta   SCREENC+XHAIRLT-1	; SCREENC[XHAIRLT-1] = FIELDC; // now visible
 
 	lda	#INITILE	;
 	outsym			;
@@ -407,6 +407,8 @@ selfmod	sta	FIELDMX		;
 	tay			;
 	lda	symchar,y	; a = symchar[a & 0x0f];
 	sta	SCREENM+XHAIRLT	; SCREENM[XHAIRLT] = a;
+	lda	FIELDC		;
+	sta	SCREENC+XHAIRLT	; SCREENC[XHAIRLT] = FIELDC; // now visible
 	
 loop	ldy	DECKREM		; for (;;) { // place a new current tile
 	bne	+		;  if (DECKREM == 0)
@@ -606,9 +608,6 @@ IJKL	:?= 0
 	cmp	#'q'		;
 	bne	loop7		;    } else if (a == 'q' || a == 'Q')
 	rts			;     return;
-	
-place	jsr	stampit		;
-	jmp	loop		;
 				;   } // keyboard input loop
 				;  } // next rotation
 				; } // next tile
