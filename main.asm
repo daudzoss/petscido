@@ -102,29 +102,19 @@ rot90cw	.macro	decrement=0
 	.endm			;} // rot90cw()
 	
 deck
-PETSCIDA :?= 1;;; FIXME :?= 0 after default deck no longer all zeroes
+PETSCIDA :?= 0
 .if PETSCIDA
-	.text	$01,$21,$31,$33,$28,$01,$21
-	.text	$29,$2d,$30,$09,$2b,$39,$31
-	.text	$28,$39,$35,$39,$29,$30,$11
-	.text	$22,$11,$31,$2a,$29,$24,$09
-	.text	$29,$34,$31,$28,$12,$10,$08
-	.text	$0a,$18,$0c,$03,$38,$1e,$1a
-	.text	$12,$0f,$3a,$1e,$1c,$0c,$17
-	.text	$3c,$14,$18,$13,$2e,$1a,$0b
-	.text	$32,$07,$36,$1c,$15,$2c,$0d
-	.text	$2e,$19,$08,$10,$19,$36,$19
+	.text	$01,$21,$31,$33,$28,$01,$21,$29,$2d,$30,$09,$2b,$39,$31
+	.text	$28,$39,$35,$39,$29,$30,$11,$22,$11,$31,$2a,$29,$24,$09
+	.text	$29,$34,$31,$28,$12,$10,$08,$0a,$18,$0c,$03,$38,$1e,$1a
+	.text	$12,$0f,$3a,$1e,$1c,$0c,$17,$3c,$14,$18,$13,$2e,$1a,$0b
+	.text	$32,$07,$36,$1c,$15,$2c,$0d,$2e,$19,$08,$10,$19,$36,$19
 .else
-	.text	0,0,0,0,0,0,0
-	.text	0,0,0,0,0,0,0
-	.text	0,0,0,0,0,0,0
-	.text	0,0,0,0,0,0,0
-	.text	0,0,0,0,0,0,0
-	.text	0,0,0,0,0,0,0
-	.text	0,0,0,0,0,0,0
-	.text	0,0,0,0,0,0,0
-	.text	0,0,0,0,0,0,0
-	.text	0,0,0,0,0,0,0
+	.text	$23,$17,$06,$36,$12,$04,$38,$2d,$1e,$08,$0f,$34,$19,$33
+	.text	$23,$17,$0b,$12,$13,$02,$19,$14,$27,$06,$21,$28,$1d,$0e
+	.text	$09,$05,$33,$29,$06,$0d,$07,$2a,$19,$0f,$20,$2a,$2c,$11
+	.text	$01,$02,$0c,$30,$35,$1c,$09,$0a,$21,$30,$1a,$35,$05,$01
+	.text	$10,$1b,$2d,$04,$03,$32,$28,$1e,$2e,$11,$39,$16,$0c,$2c
 .endif
 pstdeck
 DECKSIZ	= pstdeck-deck
@@ -251,20 +241,29 @@ main2	lda	FIELDC		;
 	eor	RNDLOC2		;        x >= *DECKSIZ;
 -	lsr			;        x >>= 1)
 	cmp	#DECKSIZ	;
-	bcs	-		;    ;
+	bcs	-		;    ; // x now a valid index into the deck
 	tax			;
-main4	lda	RNDLOC1		;   for (y = (*RNDLOC1 ^ *RNDLOC2) >> 1;
-	eor	RNDLOC2		;        y >= *DECKSIZ;
--	lsr			;        y >>= 1)
+	
+	lda	#$2		;   for (uint8_t a = 2; a; a--) { // add shuffle
+main4	pha			;
+	lda	RNDLOC1		;    for (y = (*RNDLOC1 ^ *RNDLOC2) >> 1;
+	eor	RNDLOC2		;         y >= *DECKSIZ;
+-	lsr			;         y >>= 1)
 	cmp	#DECKSIZ	;
-	bcs	-		;    ;
+	bcs	-		;     ; // y now a valid index into the deck
 	tay			;
 	lda	deck,x		;
-	pha			;   uint8_t temp = deck[x];
+	pha			;    uint8_t temp = deck[x];
 	lda	deck,y		;
-	sta	deck,x		;   deck[x] = deck[y];
+	sta	deck,x		;    deck[x] = deck[y];
 	pla			;
-	sta	deck,y		;   deck[y] = temp;
+	sta	deck,y		;    deck[y] = temp;
+	
+	pla			;
+	sec			;
+	sbc	#1		;
+	bne	main4		;   }
+
 	pla			;
 	tay			;
 	pla			;
