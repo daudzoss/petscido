@@ -118,29 +118,6 @@ PETSCIDA :?= 0
 .endif
 pstdeck
 DECKSIZ	= pstdeck-deck
-.if 0	
-.if DECKSIZ > $80
-DECKMSK	= $ff			;
-.elsif DECKSIZ > $40
-DECKMSK	= $7f
-.elsif DECKSIZ > $20
-DECKMSK	= $3f
-.elsif DECKSIZ > $10
-DECKMSK	= $1f
-.elsif DECKSIZ > $08
-DECKMSK	= $0f
-.elsif DECKSIZ > $04
-DECKMSK	= $07
-.elsif DECKSIZ > $02
-DECKMSK	= $03
-.elsif DECKSIZ > $01
-DECKMSK	= $01
-.elsif DECKSIZ > $00
-DECKMSK	= $00
-.else
-error "Deck has no initial cards"
-.endif
-.endif
 DECKREM	.byte	0
 	
 ;;;    2^1 2^3
@@ -495,7 +472,7 @@ loop6	and	#$0f		;    case 0: default: // unrotated (rightward)
 	sta	SCREENM+XHAIRRT	;     SCREENM[XHAIRRT] = a;
 
 loop7	jsr	$ffe4		;    }
-	beq	loop7		;    while ((a = getchar()) { // keyboard input loop
+	beq	loop7		;    while ((a = getchar()) { // keyboard loop
 
 	cmp	#'1'		;
 	beq	+		;
@@ -503,15 +480,15 @@ loop7	jsr	$ffe4		;    }
 	beq	+		;
 	cmp	#'3'		;
 	bne	++		;     if (a == 0x31 || a == 0x32 || a == 0x33) {
-+	and	#$0f		;
-	tay			;      a = CURTILE[a & 0x03];
-	lda	CURTILE,y	;      if (a == 0) // last few tiles, some blank
-	beq	+		;       continue;
-	sta	CURTILE		;      CURTILE[0] = a;
++	and	#$03		;
+	tay			;
+	lda	CURTILE,y	;
+	beq	+		;      if (CURTILE[a & 0x03]) { // not endgame
+	sty	CURTNUM		;       CURTNUM = a & 0x03;
+	sta	CURTILE		;      CURTILE[0] = CURTILE[CURTNUM];
 	jmp	cychair		;      goto cychair;
-	
-+	and	#$df		;     }
-	cmp	#$1d		;     if ((a &= 0xdf) == 0x1d)
++	and	#$df		;      }
+	cmp	#$1d		;     } else if ((a &= 0xdf) == 0x1d)
 	bne	+
  	jmp	inright		;      inright();
 +	cmp	#$11		;     else if (a == 0x11)
