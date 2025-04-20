@@ -482,24 +482,28 @@ loop7	jsr	$ffe4		;    }
 +	and	#$03		;
 	tay			;
 	lda	CURTILE		;
-	and	#$c0		;
+	and	#$c0		;      // turn CURTILE[0] into just its rotation
 	sta	CURTILE		;      CURTILE[0] &= 0xc0; // undo if not valid
 	lda	CURTILE,y	;
-	
-
-
-	beq	+		;      if (CURTILE[a & 0x03]) { // not endgame
-	sty	CURTNUM		;       CURTNUM = a & 0x03;
-	ora	CURTILE		;
-	sta	CURTILE		;       CURTILE[0] |= CURTILE[CURTNUM]; // rot'n
-	jmp	cyxhair		;	goto cyxhair;
-+	lda	CURTILE		;      } else {
+	bne	+		;      if (CURTILE[a & 0x03]) // not endgame 0's
 	ldy	CURTNUM		;
-	ora	CURTILE,y	;
-	sta	CURTILE		;       CURTILE[0] = CURTILE[CURTNUM];
-	jmp	loop7		;	continue;
-	
+	lda	CURTILE,y	;
++	sty	CURTNUM		;       CURTNUM = a & 0x03;
+	ora	CURTILE		;
+	sta	CURTILE		;      CURTILE[0] |= CURTILE[CURTNUM]; // w/rotn
+	clc			;
+	jmp	cyxhair		;      goto cyxhair;
 
+;	beq	+		;      if (CURTILE[a & 0x03]) { // not endgame
+;	sty	CURTNUM		;       CURTNUM = a & 0x03;
+;	ora	CURTILE		;
+;	sta	CURTILE		;       CURTILE[0] |= CURTILE[CURTNUM]; // rot'n
+;	jmp	cyxhair		;	goto cyxhair;
+;+	lda	CURTILE		;      } else {
+;	ldy	CURTNUM		;
+;	ora	CURTILE,y	;
+;	sta	CURTILE		;       CURTILE[0] = CURTILE[CURTNUM];
+;	jmp	loop7		;	continue;
 
 +	and	#$df		;      }
 	cmp	#$1d		;     } else if ((a &= 0xdf) == 0x1d)
@@ -576,8 +580,8 @@ IJKL	:?= 0
 	cmp	#'q'		;
 	beq	+		;
 	jmp	loop7		;     } else if (a == 0x51) {
-	lda	#'q'		;      printf("%cQ?", 0x13 /* HOME */);
-+	sta	SCREENM		;      if (getchar() & 0xdf != 'y')      
++	lda	#$11		;      printf("%cQ?", 0x13 /* HOME */);
+	sta	SCREENM		;      if (getchar() & 0xdf != 'y')      
 	lda	#'?'		;       numleft(); // overwrite that "Q?" prompt
 	sta	SCREENM+1	;       continue;
 -	jsr	$ffe4		;      } else
