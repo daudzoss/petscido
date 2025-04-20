@@ -371,7 +371,7 @@ loop1	lda	SCREENM+XHAIRPV	;
 	lda	SCREENM+XHAIRDN	;
 	sta	DBACKUP		;   DBACKUP = SCREENM[XHAIRDN];
 
-cychair	lda	XHAIRC		;
+cyxhair	lda	XHAIRC		;
 	sta	SCREENC+XHAIRPV	;   SCREENC[XHAIRPV] = XHAIRC;
 	bcs	loop2		;
 	
@@ -473,20 +473,34 @@ loop6	and	#$0f		;    case 0: default: // unrotated (rightward)
 
 loop7	jsr	$ffe4		;    }
 	beq	loop7		;    while ((a = getchar()) { // keyboard loop
-
 	cmp	#'1'		;
 	beq	+		;
 	cmp	#'2'		;
 	beq	+		;
 	cmp	#'3'		;
-	bne	++		;     if (a == 0x31 || a == 0x32 || a == 0x33) {
+	bne	+++		;     if (a == 0x31 || a == 0x32 || a == 0x33) {
 +	and	#$03		;
 	tay			;
+	lda	CURTILE		;
+	and	#$c0		;
+	sta	CURTILE		;      CURTILE[0] &= 0xc0; // undo if not valid
 	lda	CURTILE,y	;
+	
+
+
 	beq	+		;      if (CURTILE[a & 0x03]) { // not endgame
 	sty	CURTNUM		;       CURTNUM = a & 0x03;
-	sta	CURTILE		;      CURTILE[0] = CURTILE[CURTNUM];
-	jmp	cychair		;      goto cychair;
+	ora	CURTILE		;
+	sta	CURTILE		;       CURTILE[0] |= CURTILE[CURTNUM]; // rot'n
+	jmp	cyxhair		;	goto cyxhair;
++	lda	CURTILE		;      } else {
+	ldy	CURTNUM		;
+	ora	CURTILE,y	;
+	sta	CURTILE		;       CURTILE[0] = CURTILE[CURTNUM];
+	jmp	loop7		;	continue;
+	
+
+
 +	and	#$df		;      }
 	cmp	#$1d		;     } else if ((a &= 0xdf) == 0x1d)
 	bne	+
@@ -538,34 +552,42 @@ IJKL	:?= 0
 	jmp	loop2		;      break; // rotate cw through all 4 options
 
 +	cmp	#$0d		;
-	bne	+		;    else if (a == '\r') {
-	jsr	stampit		;     stampit(); //copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#
-	jmp	loop		;     goto loop;
+	bne	+		;     else if (a == '\r') {
+	jsr	stampit		;      stampit(); //copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#
+	jmp	loop		;      goto loop;
 	
 +	cmp	#'f'		;
-	bne	+		;    else if (a == 0x46) {
+	bne	+		;     else if (a == 0x46) {
 	lda	XHAIRC		;
 	clc			;
 	adc	#1		;
-	and	#$0f		;     a = (XHAIRC + 1) & 0x0f; // cycle color
+	and	#$0f		;      a = (XHAIRC + 1) & 0x0f; // cycle color
 	pha			;
 	lda	XHAIRC		;
 	and	#$f0		;
-	sta	XHAIRC		;     XHAIRC &= 0xf0; // keep any luminance bits
+	sta	XHAIRC		;      XHAIRC &= 0xf0; // keep any luminance bits
 	pla			;
 	ora	XHAIRC		;
-	sta	XHAIRC		;     XHAIRC |= a; // write back
-	jmp	cychair		;
+	sta	XHAIRC		;      XHAIRC |= a; // write back
+	jmp	cyxhair		;
 
 +	cmp	#'b'		;    // switch video chip background/border colors?
 	
 	cmp	#'q'		;
-	bne	loop7		;    } else if (a == 'q' || a == 'Q')
-	rts			;     return;
-				;   } // keyboard input loop
-				;  } // next rotation
-				; } // next tile
-				;} // main()
+	beq	+		;
+	jmp	loop7		;     } else if (a == 0x51) {
+	lda	#'q'		;      printf("%cQ?", 0x13 /* HOME */);
++	sta	SCREENM		;      if (getchar() & 0xdf != 'y')      
+	lda	#'?'		;       numleft(); // overwrite that "Q?" prompt
+	sta	SCREENM+1	;       continue;
+-	jsr	$ffe4		;      } else
+	beq	-		;       return;
+	and	#$df		;     }
+	cmp	#'y'		;    } // next keyboard input
+	beq	+		;   } // next rotation
+	jsr	numleft		;  } // next position
+	jmp	loop7		; } // next tile
++	rts			;} // main()
 
 liftile	.macro			;inline void liftile(void) {
 	lda	PBACKUP		; // could reduce code and redraw just the two obscured character positionss instead of all five (faster? slower?)
