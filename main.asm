@@ -1,7 +1,7 @@
 *	= BASIC+1
 	.word	(+), 2055
 	.text	$99, $22, $8e, $08, $13
-topline	.text	"?? left 1="
+topline	.text	"70 left 1="
 toplin1	.text	"?  2="
 toplin2	.text	"?  3="
 toplin3	.text	"?", $22
@@ -324,10 +324,12 @@ selfmod	sta	FIELDMX		;
 	;sty	DECKREM		;
 	lda	deck,y		;
 	sta	CURTIL3		; CURTILE[3] = deck[--DECKREM];
+	jsr	numleft		;   numleft(); // decr # remaining tiles
 	dey			;
 	sty	DECKREM		;
 	lda	deck,y		;
 	sta	CURTIL2		; CURTILE[2] = deck[--DECKREM];
+	jsr	numleft		;   numleft(); // decr # remaining tiles
 	lda	#1		;
 	sta	CURTNUM		; CURTNUM = 1; // or 2 or 3
 
@@ -339,6 +341,7 @@ loop	ldy	DECKREM		; for (;;) { // place a new current tile
 	ldy	CURTNUM		;
 	sta	CURTILE		;   CURTILE[0] =
 	sta	CURTILE,y	;            CURTILE[CURTNUM] = deck[--DECKREM];
+	jsr	numleft		;   numleft(); // decr # remaining tiles
 
 +	ldx	#3		;  for (uint8_t x = 3; x; x--) {
 -	lda	CURTILE,x	;   uint8_t a;
@@ -356,8 +359,6 @@ loop	ldy	DECKREM		; for (;;) { // place a new current tile
 	sta	SCREENM,y	;   SCREENM[TILESAT[x]+1] = a; // on the screen
 	dex			;
 	bne	-		;  }
-
-	jsr	numleft		;  numleft();
 
 	sec			;  for (uint1_t c = 1; ; c = 0) { // new position
 loop1	lda	SCREENM+XHAIRPV	;
@@ -580,21 +581,28 @@ IJKL	:?= 0
 	cmp	#'q'		;
 	beq	+		;
 	jmp	loop7		;     } else if (a == 0x51) {
-+	lda	#$11		;      printf("%cQ?", 0x13 /* HOME */);
++	lda	SCREENM+1	;
+	pha			;
+	lda	SCREENM		;
+	pha			;
+	lda	#$11		;      printf("%cQ?", 0x13 /* HOME */);
 	sta	SCREENM		;      if (getchar() & 0xdf != 'y')      
 	lda	#'?'		;       numleft(); // overwrite that "Q?" prompt
 	sta	SCREENM+1	;       continue;
 -	jsr	$ffe4		;      } else
 	beq	-		;       return;
 	and	#$df		;     }
-	cmp	#'y'		;    } // next keyboard input
-	beq	+		;   } // next rotation
-	jsr	numleft		;  } // next position
+	tay			;
+	pla			;
+	sta	SCREENM		;
+	pla			;
+	sta	SCREENM+1	;    } // next keyboard input
+	cpy	#'y'		;   } // next rotation
+	beq	+		;  } // next position
 	jmp	loop7		; } // next tile
 +	rts			;} // main()
 
-liftile	.macro			;inline void liftile(void) {
-	lda	PBACKUP		; // could reduce code and redraw just the two obscured character positionss instead of all five (faster? slower?)
+liftile	lda	PBACKUP		;inline void liftile(void) {
 	sta	SCREENM+XHAIRPV	; SCREENM[XHAIRPV] = PBACKUP;
 	lda	LBACKUP		;
 	sta	SCREENM+XHAIRLT	; SCREENM[XHAIRLT] = LBACKUP;
@@ -610,7 +618,7 @@ liftile	.macro			;inline void liftile(void) {
 	sta	SCREENC+XHAIRRT	; SCREENC[XHAIRRT] = FIELDC;
 	sta	SCREENC+XHAIRUP	; SCREENC[XHAIRUP] = FIELDC;
 	sta	SCREENC+XHAIRDN	; SCREENC[XHAIRDN] = FIELDC;
-	.endm			;} // liftile()
+	rts			;} // liftile()
 
 movptrs	.macro	delta		;inline uint1_t movptrs(const int8_t delta) { // FIXME: these waste an enormous moat merely by insisting no non-field squares appear onscreen
 .if \delta == +1
@@ -815,7 +823,7 @@ repaint	.macro			;
 inright	movptrs	+1		;void inright(void) {
 	bcs	+		; if (movptrs(+1) == 0) {
 	jmp	loop7		;  liftile();
-+	liftile			;  blitter(STL+1,STL,SBR);
++	jsr	liftile		;  blitter(STL+1,STL,SBR);
 	blitter	STL+1,STL,SBR	;  repaint(-SCREENW/2,-1);
 	lda	#$20		;
 	ldy	#SCREENW-1	;
@@ -827,7 +835,7 @@ inright	movptrs	+1		;void inright(void) {
 indown	movptrs	+FDIM		;void indown(void) {
 	bcs	+		; if (movptrs(+FDIM) == 0) {
 	jmp	loop7		;  liftile();
-+	liftile			;  blitter(STL1D,STL,SBR);
++	jsr	liftile		;  blitter(STL1D,STL,SBR);
 	blitter	STL1D,STL,SBR	;  repaint(-1,-SCREENH/2-1);
 	lda	#$20		;
 	ldx	#SCREENH-1	;
@@ -839,7 +847,7 @@ indown	movptrs	+FDIM		;void indown(void) {
 inleft	movptrs	-1		;void inleft(void) {
 	bcs	+		; if (movptrs(-1) == 0) {
 	jmp	loop7		;  liftile();
-+	liftile			;  blitter(SBR-1,SBR,STL)
++	jsr	liftile		;  blitter(SBR-1,SBR,STL)
 	blitter	SBR-1,SBR,STL	;  repaint(+SCREENW/2-1,-1);
 	lda	#$20		;
 	ldy	#0		;
@@ -852,7 +860,7 @@ inleft	movptrs	-1		;void inleft(void) {
 inup	movptrs	-FDIM		;void inup(void)
 	bcs	+		; if (movptrs(-FDIM) == 0) {
 	jmp	loop7		;  liftile();
-+	liftile			;  blitter(SBR1U,SBR,STL)
++	jsr	liftile		;  blitter(SBR1U,SBR,STL)
 	blitter	SBR1U,SBR,STL	;  repaint(-1,SCREENH/2);
 	lda	#$20		;
 	ldx	#1		;
@@ -910,6 +918,25 @@ stampit	lda	CURTILE		;uint8_t stampit(uint8_t a) {
 	lda	#0		; return 0;
 nostamp	rts			;}
 	
+.if 1
+numleft	dec	SCREENM+1	;void numleft(void) {
+	lda	SCREENM+1	; static char remain = {'6', '7'};
+	cmp	#'0'-1		; remain[1] -= 1; // decrement # remaining tiles
+	bne	++		; if (remain[1] < '0') {
+	lda	#'9'		;
+	sta	SCREENM+1	;  remain[1] = '9'; // restore 1's digit to 9
+	dec	SCREENM		;  remain[0] -= 1; // decrement 10's digit
+	lda	SCREENM		;
+	cmp	#'0'		;
+	bne	+		;  if (remain[0] == '0')
+	lda	#' '		;
+	sta	SCREENM		;   remain[0] = ' '; // at 9, wipe leading zero
+	rts			;
++	cmp	#' '-1		;  else if (remain[0] < ' ')
+	bne	+		;   _brk();
+	brk			; }
++	rts			;} // numleft()
+.else	
 numleft	lda	DECKREM		;
 	ldy	#10
 	cmp	#100
@@ -997,6 +1024,8 @@ numleft	lda	DECKREM		;
 	ora	#$30
 	sta	SCREENM+1
 	rts
+.endif
+
 
 
 
