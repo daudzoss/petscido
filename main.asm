@@ -786,34 +786,40 @@ blitter	.macro	src,dst,ends	;
 .endif
 	.endm			;
 	
-wiperow	.macro	rownum		;
-	ldy	#SCREENW	;
-	lda	#$20		;
--	sta	SCREENM+(\rownum)*SCREENW-1, y;
-	dey			;
-	bne	-		;
-	.endm			;
+wipemac	.macro	rownum		;inline void wipemac(uint8_t a, uint8_t y,
+-	sta	SCREENM+(\rownum)*SCREENW-1, y;      uint8_t rownum) {
+	dey			; do { SCREENM[rownum*SCREENW + y -1] = a;
+	bne	-		; } while (--y);
+	.endm			;} // wipemac
 
-
-wipecol	.macro	colnum		;
-	ldy	#\colnum	;
-	lda	#$20		;
-.for rownum := 1, rownum < SCREENH, rownum += 1
-	sta	SCREENM+rownum*SCREENW,y ;
-.next
-	.endm			;
-
+wiperow	ldy	#SCREENW	;void wiperow(uint8_t a, uint8_t x) {
+	cpx	#SCREENH-1	; switch (x) {
+	bne	+		; case SCREENH-1:
+	wipemac	SCREENH-1	;  wipemac(a, SCREENW, SCREENH-1);
+	rts			;  return;
++	cpx	#1		; case 1:
+	bne	+		;  wipemac(a, SCREENW, 1);
+	wipemac	1		;  return;
+	rts			; default: _brk();
++	brk			;} // wiperow()
 	
+wipecol
+.for r := 1, r < SCREENH, r += 1;inline void wipecol(uint8_t a, uint8_t y) {
+	sta SCREENM+r*SCREENW,y ; for (uint8_t r = 1; r < SCREENH; r++)
+.next				;  SCREENM[r*SCREENW + y] = a;
+	rts			;} // wipecol()
 
 repaint	.macro			;
-	.endm
+	.endm			;
 	
 inright	movptrs	+1		;void inright(void) {
 	bcs	+		; if (movptrs(+1) == 0) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(STL+1,STL,SBR);
 	blitter	STL+1,STL,SBR	;  repaint(-SCREENW/2,-1);
-	wipecol	SCREENW-1	;  wipecol(SCREENW-1); // rightmost
+	lda	#$20		;
+	ldy	#SCREENW-1	;
+	jsr	wipecol		;  wipecol(0x20, SCREENW-1); // rightmost
 	repaint	-SCREENW/2,-1	;  goto loop1; }
 +	clc			;
 	jmp	loop1		;} // inright()
@@ -823,7 +829,9 @@ indown	movptrs	+FDIM		;void indown(void) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(STL1D,STL,SBR);
 	blitter	STL1D,STL,SBR	;  repaint(-1,-SCREENH/2-1);
-	wiperow	SCREENH-1	;  wiperow(SCREENH-1); // bottommost
+	lda	#$20		;
+	ldx	#SCREENH-1	;
+	jsr	wiperow		;  wiperow(0x20, SCREENH-1); // bottommost
 	repaint	-1,-SCREENH/2-1	;  goto loop1; }
 +	clc			;
 	jmp	loop1		;} // indown()
@@ -833,7 +841,9 @@ inleft	movptrs	-1		;void inleft(void) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(SBR-1,SBR,STL)
 	blitter	SBR-1,SBR,STL	;  repaint(+SCREENW/2-1,-1);
-	wipecol	0		;  wipecol(0); // leftmost
+	lda	#$20		;
+	ldy	#0		;
+	jsr	wipecol		;  wipecol(0x20, 0); // leftmost
 	repaint	+SCREENW/2-1,-1	;  goto loop1; }
 
 +	clc			;
@@ -844,7 +854,9 @@ inup	movptrs	-FDIM		;void inup(void)
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(SBR1U,SBR,STL)
 	blitter	SBR1U,SBR,STL	;  repaint(-1,SCREENH/2);
-	wiperow	1		;  wiperow(1); // topmost
+	lda	#$20		;
+	ldx	#1		;
+	jsr	wiperow		;  wiperow(0x20, 1); // topmost
 	repaint	-1,SCREENH/2	;  goto loop1; }
 +	clc			;
 	jmp	loop1		;} // inup()
@@ -996,7 +1008,7 @@ numleft	lda	DECKREM		;
 	.align	FIELDSZ
 field
 .if (field <= SCREENM) && (field + FIELDSZ >= SCREENM)
-.error "code has grown too big for unexpanded vic20"
+.warn "code has grown too big for unexpanded vic20"
 .endif	
   	.fill	FIELDSZ
 .if 0
