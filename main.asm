@@ -614,8 +614,8 @@ liftile	.macro			;inline void liftile(void) {
 
 movptrs	.macro	delta		;inline uint1_t movptrs(const int8_t delta) { // FIXME: these waste an enormous moat merely by insisting no non-field squares appear onscreen
 .if \delta == +1
-	lda	#FDIM-SCREENW/2	; if (delta == +1) {
-	cmp	XFLDOFS		;  if (XFLDOFS <= FDIM-SCREENW/2)
+	lda	#FDIM-2		; if (delta == +1) {
+	cmp	XFLDOFS		;  if (XFLDOFS >= FDIM-2)
 	bcc	+		;   return C = 0;
 	inc	XFLDOFS		;  XFLDOFS += 1;
 	clc			;
@@ -628,8 +628,8 @@ movptrs	.macro	delta		;inline uint1_t movptrs(const int8_t delta) { // FIXME: th
 	sec			;  return C = 1; // proceed to scroll screen
 +
 .elsif \delta == +FDIM
-	lda	#FDIM-SCREENH/2	; } else if (delta == +FDIM) {
-	cmp	YFLDOFS		;  if (XFLDOFS <= FDIM-SCREENH/2)
+	lda	#FDIM-2		; } else if (delta == +FDIM) {
+	cmp	YFLDOFS		;  if (YFLDOFS >= FDIM-2)
 	bcc	+		;   return C = 0;
 	inc	YFLDOFS		;  YFLDOFS += 1;
 	clc			;
@@ -643,7 +643,7 @@ movptrs	.macro	delta		;inline uint1_t movptrs(const int8_t delta) { // FIXME: th
 +	
 .elsif \delta == -1
 	lda	XFLDOFS		; } else if (delta == -1) {
-	cmp	#SCREENW/2	;  if (XFLDOFS >= SCREENW/2)
+	cmp	#2		;  if (XFLDOFS < 2)
 	bcc	+		;   return C = 0;
 	dec	XFLDOFS		;  XFLDOFS -= 1;
 	sec			;
@@ -657,7 +657,7 @@ movptrs	.macro	delta		;inline uint1_t movptrs(const int8_t delta) { // FIXME: th
 +
 .elsif \delta == -FDIM
 	lda	YFLDOFS		; } else if (delta == -FDIM) {
-	cmp	#SCREENH/2	;  if (YFLDOFS >= SCREENW/2)
+	cmp	#2		;  if (YFLDOFS < 2)
 	bcc	+		;   return C = 0;
 	dec	YFLDOFS		;  YFLDOFS -= 1;
 	sec			;
@@ -795,7 +795,7 @@ inright	movptrs	+1		;void inright(void) {
 +	liftile			;  blitter(STL+1,STL,SBR);
 	blitter	STL+1,STL,SBR	;  repaint(-SCREENW/2,-1);
 	repaint	-SCREENW/2,-1	;  goto loop1; }
-	clc			;
++	clc			;
 	jmp	loop1		;} // inright()
 	
 indown	movptrs	+FDIM		;void indown(void) {
@@ -804,16 +804,16 @@ indown	movptrs	+FDIM		;void indown(void) {
 +	liftile			;  blitter(STL1D,STL,SBR);
 	blitter	STL1D,STL,SBR	;  repaint(-1,-SCREENH/2-1);
 	repaint	-1,-SCREENH/2-1	;  goto loop1; }
-	clc			;
++	clc			;
 	jmp	loop1		;} // indown()
 	
 inleft	movptrs	-1		;void inleft(void) {
 	bcs	+		; if (movptrs(-1) == 0) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(SBR-1,SBR,STL)
-	blitter	SBR-1,SBR,STL	;  repaint(+SCREENW/2-1,-1
+	blitter	SBR-1,SBR,STL	;  repaint(+SCREENW/2-1,-1);
 	repaint	+SCREENW/2-1,-1	;  goto loop1; }
-	clc			;
++	clc			;
 	jmp	loop1		;} // inleft()
 	
 inup	movptrs	-FDIM		;void inup(void)
@@ -822,7 +822,7 @@ inup	movptrs	-FDIM		;void inup(void)
 +	liftile			;  blitter(SBR1U,SBR,STL)
 	blitter	SBR1U,SBR,STL	;  repaint(-1,SCREENH/2);
 	repaint	-1,SCREENH/2	;  goto loop1; }
-	clc			;
++	clc			;
 	jmp	loop1		;} // inup()
 	
 angle	.macro			;inline uint2_t angle(uint8_t a) {
