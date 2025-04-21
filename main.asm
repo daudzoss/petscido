@@ -9,11 +9,6 @@ toplin3	.text	"?", $22
 +	.word 0
 start	jmp	main
 	
-TILESAT	.byte 0 ; ignored
-TILE1AT	.byte toplin1-topline
-TILE2AT	.byte toplin2-topline
-TILE3AT	.byte toplin3-topline
-	
 FDIM	= 1<<FIELDPW		;
 FIELDSZ	= FDIM*FDIM		;
 FIELDMX = field+FIELDSZ-1	; last byte of FIELDSZ-aligned region 'field'
@@ -34,28 +29,30 @@ POINTER = ZP			; static void* POINTER;
 POINTR2 = ZP+2			; static void* POINTR2;
 ZP_TEMP	= ZP+4			; static uint8_t ZP_TEMP;
 	
-CURTILE	.byte	0		; static uint8_t CURTILE[4]; // shown and 2 more
-CURTIL1	.byte	0		;
-CURTIL2	.byte	0		;
-CURTIL3	.byte	0		;
-CURTNUM	.byte	0		; static uint2_t CURTNUM;
-	
-XFLDOFS	.byte	FDIM/2		; static uint8_t XFLDOFS = FDIM/2;
-YFLDOFS	.byte	FDIM/2		; static uint8_t YFLDOFS;
+CURTILE	= vararea+$0 ;.byte ?	; static uint8_t CURTILE[4]; // shown and 2 more
+CURTIL1	= vararea+$1 ;.byte ?	;
+CURTIL2	= vararea+$2 ;.byte ?	;
+CURTIL3	= vararea+$3 ;.byte ?	;
+CURTNUM	= vararea+$4 ;.byte ?	; static uint2_t CURTNUM;
+PBACKUP	= vararea+$5 ;.byte ?	; static uint8_t PBACKUP;
+LBACKUP	= vararea+$6 ;.byte ?	; static uint8_t LBACKUP;
+RBACKUP = vararea+$7 ;.byte ?	; static uint8_t RBACKUP;
+UBACKUP	= vararea+$8 ;.byte ?	; static uint8_t UBACKUP;
+DBACKUP	= vararea+$9 ;.byte ?	; static uint8_t DBACKUP;
+XFLDOFS	= vararea+$a ;.byte ?	; static uint8_t XFLDOFS;
+YFLDOFS	= vararea+$b ;.byte ?	; static uint8_t YFLDOFS;
+
 ROTNOFS .byte	FDIM+1		; static const ROTNOFS[] = {FDIM+1,
 	.byte 	FDIM*2		;                           FDIM*2,
 	.byte 	FDIM-1		;                           FDIM-1,
-	.byte	0		;                           0};
+TILESAT	.byte	0		;                           0};// shared with..
+TILE1AT	.byte	toplin1-topline	; static const TILESAT[] = {0, topline+10,
+TILE2AT	.byte	toplin2-topline	;                              topline+15,
+TILE3AT	.byte	toplin3-topline	;                              topline+20};
 
-UNRSLVD	.byte	$05		; static uint8_t UNRSLVD = 5; // from INITILE
-PBACKUP	.byte	$20		; static uint8_t PBACKUP = ' ';
-LBACKUP	.byte	$20		; static uint8_t LBACKUP = ' ';
-RBACKUP .byte	$20		; static uint8_t RBACKUP = ' ';
-UBACKUP	.byte	$20		; static uint8_t UBACKUP = ' ';
-DBACKUP	.byte	$20		; static uint8_t DBACKUP = ' ';
-	
-FIELDC	.byte	$0		; black
-XHAIRC	.byte	$62		; orange
+UNRSLVD	.byte	$05		; static uint8_t UNRSLVD = 5; // INITILE's 5 1's
+FIELDC	.byte	$0		; static uint8_t FIELDC = 0; // black
+XHAIRC	.byte	$62		; static uint8_t XHAIRC = 0x62; // bright orange
 	
 ;;;    2^3
 ;;; 2^2   2^0
@@ -1040,7 +1037,4 @@ field
 .warn "code has grown too big for unexpanded vic20"
 .endif	
   	.fill	FIELDSZ
-.if 0
-	brk
-.endif	
-
+vararea
