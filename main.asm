@@ -786,6 +786,25 @@ blitter	.macro	src,dst,ends	;
 .endif
 	.endm			;
 	
+wiperow	.macro	rownum		;
+	ldy	#SCREENW	;
+	lda	#$20		;
+-	sta	SCREENM+(\rownum)*SCREENW-1, y;
+	dey			;
+	bne	-		;
+	.endm			;
+
+
+wipecol	.macro	colnum		;
+	ldy	#\colnum	;
+	lda	#$20		;
+.for rownum := 1, rownum < SCREENH, rownum += 1
+	sta	SCREENM+rownum*SCREENW,y ;
+.next
+	.endm			;
+
+	
+
 repaint	.macro			;
 	.endm
 	
@@ -794,6 +813,7 @@ inright	movptrs	+1		;void inright(void) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(STL+1,STL,SBR);
 	blitter	STL+1,STL,SBR	;  repaint(-SCREENW/2,-1);
+	wipecol	SCREENW-1	;  wipecol(SCREENW-1); // rightmost
 	repaint	-SCREENW/2,-1	;  goto loop1; }
 +	clc			;
 	jmp	loop1		;} // inright()
@@ -803,6 +823,7 @@ indown	movptrs	+FDIM		;void indown(void) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(STL1D,STL,SBR);
 	blitter	STL1D,STL,SBR	;  repaint(-1,-SCREENH/2-1);
+	wiperow	SCREENH-1	;  wiperow(SCREENH-1); // bottommost
 	repaint	-1,-SCREENH/2-1	;  goto loop1; }
 +	clc			;
 	jmp	loop1		;} // indown()
@@ -812,7 +833,9 @@ inleft	movptrs	-1		;void inleft(void) {
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(SBR-1,SBR,STL)
 	blitter	SBR-1,SBR,STL	;  repaint(+SCREENW/2-1,-1);
+	wipecol	0		;  wipecol(0); // leftmost
 	repaint	+SCREENW/2-1,-1	;  goto loop1; }
+
 +	clc			;
 	jmp	loop1		;} // inleft()
 	
@@ -821,6 +844,7 @@ inup	movptrs	-FDIM		;void inup(void)
 	jmp	loop7		;  liftile();
 +	liftile			;  blitter(SBR1U,SBR,STL)
 	blitter	SBR1U,SBR,STL	;  repaint(-1,SCREENH/2);
+	wiperow	1		;  wiperow(1); // topmost
 	repaint	-1,SCREENH/2	;  goto loop1; }
 +	clc			;
 	jmp	loop1		;} // inup()
@@ -971,6 +995,9 @@ numleft	lda	DECKREM		;
 
 	.align	FIELDSZ
 field
+.if (field <= SCREENM) && (field + FIELDSZ >= SCREENM)
+.error "code has grown too big for unexpanded vic20"
+.endif	
   	.fill	FIELDSZ
 .if 0
 	brk
