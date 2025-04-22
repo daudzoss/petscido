@@ -142,12 +142,16 @@ innsyma	.text	$1		; 0:
 	.text	$b		; 6: enters from top left, exits bottom left
 	.text	$f		; 7: enters all left sides, closed off
 	
-innsym	.macro			;static uint4_t innsyma = {1,5,9,13,3,7,11,15};
+innsymm	.macro			;static uint4_t innsyma = {1,5,9,13,3,7,11,15};
 	and	#$07		;inline uint4_t innsym(uint6_t a) { // on 3 lsb
 	tay			; return innsyma[a & 7];
 	lda	innsyma,y	;} // innsym()
 	.endm			;
 
+innsym	.macro
+	jsr	innsyme
+	.endm
+	
 outsyma	.text	1;,1,1,1,1,1,1,1; 000000-000111: no entries/exits in right half
 	.text	$c		; 001000-001111: upper right to left half
 	.text	$6		; 010000-010111: lower right to left half
@@ -157,13 +161,17 @@ outsyma	.text	1;,1,1,1,1,1,1,1; 000000-000111: no entries/exits in right half
 	.text	$7		; 110000-110111: right+lower right to left half
 	.text	$f		; 111000-111111: all right entries to left half
 
-outsym	.macro			;static uint4_t outsyma = {1,12,6,14,5,13,7,15};
+outsymm	.macro			;static uint4_t outsyma = {1,12,6,14,5,13,7,15};
 	lsr			;inline uint4_t outsym(uint6_t a) {
 	lsr			;
 	lsr			;
 	and	#$07		;
 	tay			; return outsym[(a & 0x38) >> 3];
 	lda	outsyma,y	;}
+	.endm
+
+outsym	.macro
+	jsr	outsyme
 	.endm
 
 copynyb	.macro
@@ -1090,6 +1098,10 @@ rot90cx	rot90c	dx
 	rts
 rot90cy	rot90c	dy
 	rts
+innsyme	innsymm
+	rts
+outsyme outsymm
+	rts
 	
 	.align	FIELDSZ
 field
@@ -1098,3 +1110,5 @@ field
 .endif	
   	.fill	FIELDSZ
 vararea
+	
+
