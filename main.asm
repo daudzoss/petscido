@@ -567,6 +567,7 @@ loop7	jsr	$ffe4		;    }
 +	jmp	loop		;      goto loop; // draw new tile and reveal
 	
 +	cmp	#'f'		;
+.if VIC20NO
 	bne	+		;     else if (a == 0x46) {
 	lda	XHAIRC		;
 	clc			;
@@ -582,6 +583,7 @@ loop7	jsr	$ffe4		;    }
 	jmp	cyxhair		;
 
 +	cmp	#'b'		;    // switch video chip background/border colors?
+.endif
 	
 +	cmp	#$14
 	bne	++		;
@@ -612,6 +614,7 @@ loop7	jsr	$ffe4		;    }
 	beq	+		;
 	jmp	loop7		;     } else if (a == 0x51) {
 +	lda	SCREENM+1	;
+.if VIC20NO
 	pha			;
 	lda	SCREENM		;
 	pha			;
@@ -619,14 +622,17 @@ loop7	jsr	$ffe4		;    }
 	sta	SCREENM		;      if (getchar() & 0xdf != 'y')      
 	lda	#'?'		;       numleft(); // overwrite that "Q?" prompt
 	sta	SCREENM+1	;       continue;
+.endif
 -	jsr	$ffe4		;      } else
 	beq	-		;       return;
 	and	#$df		;     }
 	tay			;
+.if VIC20NO
 	pla			;
 	sta	SCREENM		;
 	pla			;
 	sta	SCREENM+1	;    } // next keyboard input
+.endif
 	cpy	#'y'		;   } // next rotation
 	beq	+		;  } // next position
 	jmp	loop7		; } // next tile
