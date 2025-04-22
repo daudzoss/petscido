@@ -79,7 +79,7 @@ symchar	.text	$80|$20		; 0: space, unoccupied spot in play area
 
 dx = 1
 dy = 2
-rot90cw	.macro	decrement=0
+rot90c	.macro	decrement=0
 	and	#$0f		;inline uint8_t rot90cw(uint4_t a,
 .if \decrement
 -	clc			;                       uint2_t y) { // nyb rot
@@ -99,6 +99,16 @@ rot90cw	.macro	decrement=0
 .endif
 	.endm			;} // rot90cw()
 	
+rot90cw	.macro	decrement=0
+.if \decrement == 0	
+	jsr	rot90c0
+.elsif \decrement == dx
+	jsr	rot90cx
+.elsif \decrement == dy
+	jsr	rot90cy
+.endif
+	.endm
+
 deck
 PETSCIDA :?= 0
 .if PETSCIDA
@@ -1074,6 +1084,13 @@ numleft	dec	SCREENM+1	;void numleft(void) {
 	brk			; }
 +	rts			;} // numleft()
 
+rot90c0	rot90c
+	rts
+rot90cx	rot90c	dx
+	rts
+rot90cy	rot90c	dy
+	rts
+	
 	.align	FIELDSZ
 field
 .if (field <= SCREENM) && (field + FIELDSZ >= SCREENM)
