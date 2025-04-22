@@ -332,7 +332,7 @@ selfmod	sta	FIELDMX		;
 	sta	CURTNUM		; CURTNUM = 1; // or 2 or 3
 
 loop	ldy	DECKREM		; for (;;) { // place a new current tile
-	beq	+		;  if (DECKREM != 0)
+	beq	reveal		;  if (DECKREM != 0)
 	dey			;
 	sty	DECKREM		;
 	lda	deck,y		;
@@ -341,7 +341,7 @@ loop	ldy	DECKREM		; for (;;) { // place a new current tile
 	sta	CURTILE,y	;            CURTILE[CURTNUM] = deck[--DECKREM];
 	jsr	numleft		;   numleft(); // decr # remaining tiles
 
-+	ldx	#3		;  for (uint8_t x = 3; x; x--) {
+reveal	ldx	#3		;  for (uint8_t x = 3; x; x--) {
 -	lda	CURTILE,x	;   uint8_t a;
 	innsym			;
 	tay			;
@@ -493,17 +493,6 @@ loop7	jsr	$ffe4		;    }
 	clc			;
 	jmp	cyxhair		;      goto cyxhair;
 
-;	beq	+		;      if (CURTILE[a & 0x03]) { // not endgame
-;	sty	CURTNUM		;       CURTNUM = a & 0x03;
-;	ora	CURTILE		;
-;	sta	CURTILE		;       CURTILE[0] |= CURTILE[CURTNUM]; // rot'n
-;	jmp	cyxhair		;	goto cyxhair;
-;+	lda	CURTILE		;      } else {
-;	ldy	CURTNUM		;
-;	ora	CURTILE,y	;
-;	sta	CURTILE		;       CURTILE[0] = CURTILE[CURTNUM];
-;	jmp	loop7		;	continue;
-
 +	and	#$df		;      }
 	cmp	#$1d		;     } else if ((a &= 0xdf) == 0x1d)
 	bne	+
@@ -550,9 +539,11 @@ loop7	jsr	$ffe4		;    }
 	jmp	loop2		;      break; // rotate cw through all 4 options
 
 +	cmp	#$0d		;
-	bne	+		;     else if (a == '\r') {
-	jsr	stampit		;      stampit(); //copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#
-	jmp	loop		;      goto loop;
+	bne	++		;     else if (a == '\r') {
+	jsr	stampit		;
+	bne	+		;      if (stampit() == 0) // copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#      
+	jmp	loop;7		;       /*continue*/; // FIXME: stampit() isn't returning correctly
++	jmp	loop		;      goto loop; // draw new tile and reveal
 	
 +	cmp	#'f'		;
 	bne	+		;     else if (a == 0x46) {
@@ -571,7 +562,32 @@ loop7	jsr	$ffe4		;    }
 
 +	cmp	#'b'		;    // switch video chip background/border colors?
 	
-	cmp	#'q'		;
++	cmp	#$14
+	bne	++		;
+	ldy	DECKREM		;
+	beq	++		;     } else if ((a == 0x14) && DECKREM) {
+	ldx	#$03		;      for (uint8_t x = 3; x; x--) {
+-	lda	CURTILE,x	;
+	beq	+		;       if (CURTILE[x]) {
+	pha			;
+	tya			;
+	pha			;        uint8_t stack = y;
+-	lda	deck-1,y	;        do {
+	sta	deck,y		;         deck[y] = deck[y-1];
+	dey			;
+	bne	-		;        } while (--y);
+	pla			;
+	tay			;        y = stack;
+	pla			;
+	sta	deck		;        deck[0] = CURTILE[x];
+	lda	deck,y		;
+	sta	CURTILE,x	;
+	sta	CURTILE		;        CURTILE[0] = CURTILE[x] = deck[DECKREM];
++	dex			;       }
+	bne	--		;      }
+	jmp	reveal		;
+	
++	cmp	#'q'		;
 	beq	+		;
 	jmp	loop7		;     } else if (a == 0x51) {
 +	lda	SCREENM+1	;
@@ -595,7 +611,9 @@ loop7	jsr	$ffe4		;    }
 	jmp	loop7		; } // next tile
 +	rts			;} // main()
 
-liftile	lda	PBACKUP		;inline void liftile(void) {
+
+	
+liftile	lda	PBACKUP		;void liftile(void) {
 	sta	SCREENM+XHAIRPV	; SCREENM[XHAIRPV] = PBACKUP;
 	lda	LBACKUP		;
 	sta	SCREENM+XHAIRLT	; SCREENM[XHAIRLT] = LBACKUP;
@@ -1035,10 +1053,9 @@ stampit	lda	CURTILE		;uint8_t stampit(uint8_t a) {
 	lda	CURTILE		;    return CURTILE[0];
 	rts			;   }
 +	pla			;  }
-	lda	#0		; return 0;
-nostamp	rts			;}
+nostamp	lda	#0		; return 0;
+	rts			;}
 	
-.if 1
 numleft	dec	SCREENM+1	;void numleft(void) {
 	lda	SCREENM+1	; static char remain = {'6', '7'};
 	cmp	#'0'-1		; remain[1] -= 1; // decrement # remaining tiles
@@ -1056,103 +1073,6 @@ numleft	dec	SCREENM+1	;void numleft(void) {
 	bne	+		;   _brk();
 	brk			; }
 +	rts			;} // numleft()
-.else	
-numleft	lda	DECKREM		;
-	ldy	#10
-	cmp	#100
-	bcc	*+3
-	brk
-
-	dey
-	cmp	#90
-	bcc	*+7
-	sec
-	sbc	#90
-	bcs	*+2+90
-
-	dey
-	cmp	#80
-	bcc	*+7
-	sec
-	sbc	#80
-	bcs	*+2+80
-
-	dey
-	cmp	#70
-	bcc	*+7
-	sec
-	sbc	#70
-	bcs	*+2+70
-
-	dey
-	cmp	#60
-	bcc	*+7
-	sec
-	sbc	#60
-	bcs	*+2+60
-
-	dey
-	cmp	#50
-	bcc	*+7
-	sec
-	sbc	#50
-	bcs	*+2+50
-
-	dey
-	cmp	#40
-	bcc	*+7
-	sec
-	sbc	#40
-	bcs	*+2+40
-
-	dey
-	cmp	#30
-	bcc	*+7
-	sec
-	sbc	#30
-	bcs	*+2+30
-
-	dey
-	cmp	#20
-	bcc	*+7
-	sec
-	sbc	#20
-	bcs	*+2+20
-
-	dey
-	cmp	#10
-	bcc	*+7
-	sec
-	sbc	#10
-	bcs	*+2+10
-
-	dey
-	cmp	#0
-	bcc	*+7
-	sec
-	sbc	#0
-	bcs	*+2+0
-
-	pha
-	tya
-	bne	+
-	lda	#' '
-	bne	++
-+	ora	#$30
-+	sta	SCREENM
-	pla
-	ora	#$30
-	sta	SCREENM+1
-	rts
-.endif
-
-
-
-
-
-
-
-
 
 	.align	FIELDSZ
 field
