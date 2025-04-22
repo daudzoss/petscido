@@ -8,6 +8,7 @@ toplin3	.text	"?", $22
 	.null	$3a, $9e, format("%4d", start)
 +	.word 0
 start	jmp	main
+VIC20NO	= (SCREENM != $1e00)	; many features won't fit in unexpanded vic20
 	
 FDIM	= 1<<FIELDPW		;
 FIELDSZ	= FDIM*FDIM		;
@@ -39,8 +40,8 @@ LBACKUP	= vararea+$6 ;.byte ?	; static uint8_t LBACKUP;
 RBACKUP = vararea+$7 ;.byte ?	; static uint8_t RBACKUP;
 UBACKUP	= vararea+$8 ;.byte ?	; static uint8_t UBACKUP;
 DBACKUP	= vararea+$9 ;.byte ?	; static uint8_t DBACKUP;
-XFLDOFS	= vararea+$a ;.byte ?	; static uint8_t XFLDOFS;
-YFLDOFS	= vararea+$b ;.byte ?	; static uint8_t YFLDOFS;
+XFLDOFS	= vararea+$a ;.byte ?	; static uint8_t XFLDOFS; // horizontal
+YFLDOFS	= vararea+$b ;.byte ?	; static uint8_t YFLDOFS; // vertical
 
 ROTNOFS .byte	FDIM+1		; static const ROTNOFS[] = {FDIM+1,
 	.byte 	FDIM*2		;                           FDIM*2,
@@ -517,8 +518,7 @@ loop7	jsr	$ffe4		;    }
 	bne	+
 	jmp	inup		;      inup();
 +
-WASD	:?= 0
-.if WASD
+.if VIC20NO
 	cmp	#'d'		;     else if (a == 0x44)
 	bne	+
  	jmp	inright		;      inright();
@@ -531,11 +531,7 @@ WASD	:?= 0
 +	cmp	#'w'		;     else if (a == 0x57)
 	bne	+
 	jmp	inup		;      inup();
-+
-.endif
-IJKL	:?= 0
-.if IJKL
-	cmp	#'l'		;     else if (a == 0x4c)
++	cmp	#'l'		;     else if (a == 0x4c)
 	bne 	+
 	jmp	inright		;      inright();
 +	cmp	#'k'		;     else if (a == 0x4b)
@@ -813,57 +809,184 @@ wipecol
 	sta SCREENM+r*SCREENW,y ; for (uint8_t r = 1; r < SCREENH; r++)
 .next				;  SCREENM[r*SCREENW + y] = a;
 	rts			;} // wipecol()
+ 
+setpntr	; lda	XFLDOFS		;void setpntr(uint8_t a) { // a = XFLDOFS
+	sec			; // set POINTER to overlap the field with the
+	sbc	#SCREENW/2	; // screen square below the upper-left corner
+	ldx	#8-FIELDPW	; // of the screen
+-	asl			;
+	dex			;
+	bne	-		;
+	sta	POINTER		; POINTER = (void*) ((XFLDOFS - SCREENW/2)
+	lda	YFLDOFS		;
+	sec			;
+	sbc	#SCREENH/2 - 1	;
+	sta	1+POINTER	;
+	ldx	#8-FIELDPW	;
+-	lsr			;
+	ror			;
+	dex			;
+	bne	-		;       | (FDIM * (YFLDOFS - SCREENH / 2 + 1))
+	ora	#>field		;       | field);
+	rts			;} // setpntr()
 
-repaint	.macro			;
-	.endm			;
+setpntb	; lda	XFLDOFS		;void setpntb(uint8_t a) { // a = XFLDOFS
+	jsr	setpntr		; setpntr(a);
+	ldx	#SCREENH-1	; // set POINTER to overlap the field with the
+-	clc			; // screen square at the lower-left corner
+	lda	POINTER		; // of the screen
+	adc	#FDIM		;
+	sta	POINTER		;
+	lda	1+POINTER	;
+	adc	#0		;
+	sta	1+POINTER	;
+	dex			;
+	bne	-		; POINTER += FDIM * (SCREENH - 2); // lower left
+	rts			;}
+	
+regenlr	lda	#>STL		;void regenlr(uint8_t x, uint8_t y) {
+	sta	regensm+1	; uint8_t* dest; // x is window height, y is col
+	lda	#<STL		;
+	sta	regensm+2	; for (dest = STL; x; x--) {
+-	txa			;
+	pha			;
+	lda	(POINTER),y	;
+	;and	#$0f		;
+	tax			;
+	lda	symchar,x	;
+regensm	sta	$ffff,y		;  dest[y] = symchar[POINTER[y] /* & 0x0f */];
+	clc			;
+	lda	POINTER		;
+	adc	#FDIM		;
+	sta	POINTER		;
+	lda	1+POINTER	;
+	adc	#0		;
+	sta	1+POINTER	;  POINTER += FDIM;
+	clc			;
+	lda	regensm+1	;
+	adc	#SCREENW	;
+	sta	regensm+1	;
+	lda	regensm+2	;
+	adc	#0		;
+	sta	regensm+2	;  dest += SCREENW;
+	pla			;
+	tax			;
+	dex			;
+	bne	-		; }
+	rts			;} // regenlr()
+
+regent	lda	#>STL		;void regent(void) {
+	sta	regn2sm+1	; uint8_t* dest = STL /*upper left*/;
+	lda	#<STL		;
+	sta	regn2sm+2	; regentb(dest);
+	jmp	regentb		;}
+regenb	lda	#>(SBR1U+1)	;void regenb(void) {
+	sta	regn2sm+1	; uint8_t* dest = SBR1U + 1 /*lower left*/;
+	lda	#<(SBR1U+1)	; regentb(dest);
+	sta	regn2sm+2	;}
+regentb	ldy	#SCREENW-1	;void regentb(uint8_t* dest) {
+-	lda	(POINTER),y	; for (int8_t y = SCREENW - 1; y >= 0; y--)
+	;and	#$0f		;
+	tax			;
+	lda	symchar,x	;
+regn2sm	sta	$ffff,y		;  dest[y] = symchar[POINTER[y] /* & 0x0f */];
+	clc			;
+	dey			;
+	bpl	-		;
+	rts			;} // regenlr()
+
+repaint	.macro	xlim=0, ylim=0	;inline void repaint(uint8_t xlim,uint8_t ylim){
+.if xlim			; if (xlim) {
+ .if xlim < 0			;  if (xlim < 0) {
+	lda	XFLDOFS		;   // regenerate right edge from field
+	cmp	#xlim		;
+	bcs	+		;   if (XFLDOFS < xlim) {
+	jsr	setpntr		;    setpntr(XFLDOFS);
+	ldy	#SCREENW-1	;
+	ldx	#SCREENH	;    regenlr(SCREENH, SCREENW-1);
+	jsr	regenlr		;   }
++
+ .else				;  } else {
+	lda	XFLDOFS		;   // regenerate left edge from field
+	cmp	#xlim+1		;
+	bcc	+		;   if (XFLDOFS > xlim) {
+	jsr	setpntr		;    setpntr(XFLDOFS);
+	ldy	#0		;
+	ldx	#SCREENH	;    regenlr(SCREENH, 0);
+	jsr	regenlr		;   }
++
+ .endif				;  } 
+.elsif ylim			; } else if (ylim) {
+ .if ylim < 0			;  if (ylim < 0) {
+	lda	YFLDOFS		;   // regenerate bottom edge from field
+	cmp	#ylim		;
+	bcs	+		;   if (YFLDOFS < ylim) {
+	lda	XFLDOFS		;
+	jsr	setpntb		;    setpntb(XFLDOFS); // special case
+	ldy	#SCREENW	;    regenb();
+	jsr	regenb		;   }
++
+ .else
+	lda	YFLDOFS		;   // regenerate top edge from field
+	cmp	#ylim+1		;
+	bcc	+		;   if (YFLDOFS > ylim) {
+	lda	XFLDOFS		;
+	jsr	setpntr		;    setpntr(XFLDOFS);
+	ldy	#SCREENW	;    regent();
+	jsr	regent		;   }
++
+ .endif				;  }
+.else				; }
+ .error "either xlim or ylim must be nonzero"
+.endif
+	.endm			;} // repaint()
 	
 inright	movptrs	+1		;void inright(void) {
 	bcs	+		; if (movptrs(+1) == 0) {
 	jmp	loop7		;  liftile();
 +	jsr	liftile		;  blitter(STL+1,STL,SBR);
-	blitter	STL+1,STL,SBR	;  repaint(-SCREENW/2,-1);
+	blitter	STL+1,STL,SBR	;
 	lda	#$20		;
-	ldy	#SCREENW-1	;
-	jsr	wipecol		;  wipecol(0x20, SCREENW-1); // rightmost
-	repaint	-SCREENW/2,-1	;  goto loop1; }
-+	clc			;
+	ldy	#SCREENW-1	;  wipecol(0x20, SCREENW-1); // rightmost
+	jsr	wipecol		;  repaint(-SCREENW/2,0);
+;	repaint	-SCREENW/2,	;  goto loop1;
++	clc			; }
 	jmp	loop1		;} // inright()
 	
 indown	movptrs	+FDIM		;void indown(void) {
 	bcs	+		; if (movptrs(+FDIM) == 0) {
 	jmp	loop7		;  liftile();
 +	jsr	liftile		;  blitter(STL1D,STL,SBR);
-	blitter	STL1D,STL,SBR	;  repaint(-1,-SCREENH/2-1);
+	blitter	STL1D,STL,SBR	;
 	lda	#$20		;
-	ldx	#SCREENH-1	;
-	jsr	wiperow		;  wiperow(0x20, SCREENH-1); // bottommost
-	repaint	-1,-SCREENH/2-1	;  goto loop1; }
-+	clc			;
+	ldx	#SCREENH-1	;  wiperow(0x20, SCREENH-1); // bottommost
+	jsr	wiperow		;  repaint(0,-SCREENH/2-1);
+;	repaint	,-SCREENH/2-1	;  goto loop1;
++	clc			; }
 	jmp	loop1		;} // indown()
 	
 inleft	movptrs	-1		;void inleft(void) {
 	bcs	+		; if (movptrs(-1) == 0) {
 	jmp	loop7		;  liftile();
 +	jsr	liftile		;  blitter(SBR-1,SBR,STL)
-	blitter	SBR-1,SBR,STL	;  repaint(+SCREENW/2-1,-1);
+	blitter	SBR-1,SBR,STL	;
 	lda	#$20		;
-	ldy	#0		;
-	jsr	wipecol		;  wipecol(0x20, 0); // leftmost
-	repaint	+SCREENW/2-1,-1	;  goto loop1; }
-
-+	clc			;
+	ldy	#0		;  wipecol(0x20, 0); // leftmost
+	jsr	wipecol		;  repaint(+SCREENW/2-1,0);
+;	repaint	+SCREENW/2-1,	;  goto loop1;
++	clc			; }
 	jmp	loop1		;} // inleft()
 	
 inup	movptrs	-FDIM		;void inup(void)
 	bcs	+		; if (movptrs(-FDIM) == 0) {
 	jmp	loop7		;  liftile();
 +	jsr	liftile		;  blitter(SBR1U,SBR,STL)
-	blitter	SBR1U,SBR,STL	;  repaint(-1,SCREENH/2);
+	blitter	SBR1U,SBR,STL	;
 	lda	#$20		;
-	ldx	#1		;
-	jsr	wiperow		;  wiperow(0x20, 1); // topmost
-	repaint	-1,SCREENH/2	;  goto loop1; }
-+	clc			;
+	ldx	#1		;  wiperow(0x20, 1); // topmost
+	jsr	wiperow		;  repaint(0,SCREENH/2);
+;	repaint	,SCREENH/2	;  goto loop1;
++	clc			; }
 	jmp	loop1		;} // inup()
 	
 angle	.macro			;inline uint2_t angle(uint8_t a) {
