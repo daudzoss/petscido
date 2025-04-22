@@ -174,7 +174,7 @@ outsym	.macro
 	jsr	outsyme
 	.endm
 
-copynyb	.macro
+copynym	.macro
 	and	#$0f		;inline uint8_t copynyb (uint4_t a) {
 	pha			;
 	tsx			;
@@ -185,6 +185,9 @@ copynyb	.macro
 	ora	$101,x		;
 	inx			; return ((a & 0x0f) << 4) | (a & 0x0f);
 	txs			;} // copynyb()
+	.endm
+copynyb	.macro
+	jsr	copynye
 	.endm
 	
 chckptr	.macro	delta		;
@@ -1101,6 +1104,8 @@ rot90cy	rot90c	dy
 innsyme	innsymm
 	rts
 outsyme outsymm
+	rts
+copynye	copynym
 	rts
 	
 	.align	FIELDSZ
