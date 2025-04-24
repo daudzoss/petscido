@@ -385,7 +385,7 @@ selfmod	sta	FIELDMX		;
 	sta	CURTNUM		; CURTNUM = 1; // or 2 or 3
 
 loop	ldy	DECKREM		; for (;;) { // place a new current tile
-	beq	reveal		;  if (DECKREM != 0)
+	beq	+		;  if (DECKREM != 0)
 	dey			;
 	sty	DECKREM		;
 	lda	deck,y		;
@@ -393,23 +393,7 @@ loop	ldy	DECKREM		; for (;;) { // place a new current tile
 	sta	CURTILE		;   CURTILE[0] =
 	sta	CURTILE,y	;            CURTILE[CURTNUM] = deck[--DECKREM];
 	jsr	numleft		;   numleft(); // decr # remaining tiles
-
-reveal	ldx	#3		;  for (uint8_t x = 3; x; x--) {
--	lda	CURTILE,x	;   uint8_t a;
-	innsym			;
-	tay			;
-	lda	symchar,y	;   a = symchar[innsym(CURTILE[x])]; // left
-	ldy	TILESAT,x	;
-	sta	SCREENM,y	;   SCREENM[TILESAT[x]] = a; // on the screen
-	lda	CURTILE,x	;
-	outsym			;
-	tay			;
-	lda	symchar,y	;   a = symchar[outsym(CURTILE[x])]; // right
-	ldy	TILESAT,x	;
-	iny			;
-	sta	SCREENM,y	;   SCREENM[TILESAT[x]+1] = a; // on the screen
-	dex			;
-	bne	-		;  }
++	jsr	reveal		;   reveal();
 
 	sec			;  for (uint1_t c = 1; ; c = 0) { // new position
 loop1	lda	SCREENM+XHAIRPV	;
@@ -639,11 +623,15 @@ loop7	jsr	$ffe4		;    }
 	pla			;
 	sta	deck		;        deck[0] = CURTILE[x];
 	lda	deck,y		;
-	sta	CURTILE,x	;
-	sta	CURTILE		;        CURTILE[0] = CURTILE[x] = deck[DECKREM];
+	sta	CURTILE,x	;        CURTILE[x] = deck[DECKREM]
+	lda	CURTILE		;
+	and	#$c0		;        CURTILE[0] &= 0xc0; // grab rot'n bits
+	ora	CURTILE,x	;
+	sta	CURTILE		;        CURTILE[0] |= CURTILE[x];
 +	dex			;       }
 	bne	--		;      }
-	jmp	reveal		;
+	jsr	reveal		;      reveal();
+	jmp	cyxhair		;
 	
 +	cmp	#'q'		;
 	beq	+		;
@@ -675,6 +663,23 @@ loop7	jsr	$ffe4		;    }
 +	rts			;} // main()
 
 
+reveal	ldx	#3		;void reveal(void) {
+-	lda	CURTILE,x	; for (uint8_t x = 3; x; x--) {  
+	innsym			;
+	tay			;
+	lda	symchar,y	;  uint8_t a = symchar[innsym(CURTILE[x])]; // L
+	ldy	TILESAT,x	;
+	sta	SCREENM,y	;  SCREENM[TILESAT[x]] = a; // on the screen
+	lda	CURTILE,x	;
+	outsym			;
+	tay			;
+	lda	symchar,y	;  a = symchar[outsym(CURTILE[x])]; // R
+	ldy	TILESAT,x	;
+	iny			;
+	sta	SCREENM,y	;  SCREENM[TILESAT[x]+1] = a; // on the screen
+	dex			;
+	bne	-		; }
+	rts			;} // reveal()
 	
 liftile	lda	PBACKUP		;void liftile(void) {
 	sta	SCREENM+XHAIRPV	; SCREENM[XHAIRPV] = PBACKUP;
