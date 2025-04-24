@@ -20,7 +20,7 @@
 .endif
 	.word	(+), 2055
 	.text	$99,$22		; PRINT "
-	.text	$09,$8e,$08,$13	; CHR$(9) CHR$(142) CHR$(8) CHR$(19)
+	.text	$09,$8e,$08,$93	; CHR$(9) CHR$(142) CHR$(8) CHR$(19)
 topline	.text	"70 left 1="
 toplin1	.text	"?  2="
 toplin2	.text	"?  3="
@@ -67,7 +67,7 @@ UBACKUP	= vararea+$8 ;.byte ?	; static uint8_t UBACKUP;
 DBACKUP	= vararea+$9 ;.byte ?	; static uint8_t DBACKUP;
 XFLDOFS	= vararea+$a ;.byte ?	; static uint8_t XFLDOFS; // horizontal
 YFLDOFS	= vararea+$b ;.byte ?	; static uint8_t YFLDOFS; // vertical
-
+DECKREM	= vararea+$c ;.byte ?	; static uint8_t DECKREM;
 ROTNOFS .byte	FDIM+1		; static const ROTNOFS[] = {FDIM+1,
 	.byte 	FDIM*2		;                           FDIM*2,
 	.byte 	FDIM-1		;                           FDIM-1,
@@ -151,13 +151,13 @@ PETSCIDA :?= 0
 .endif
 pstdeck
 DECKSIZ	= pstdeck-deck
-DECKREM	.byte	0
 	
 ;;;    2^1 2^3
 ;;; 2^0       2^5
 ;;;    2^2 2^4
 ;;; upper 2 msb are used for (clockwise) rotation angle
 	
+.if VIC20NO
 innsyma	.text	$1		; 0: 
 	.text	$5		; 1: enters from left, closed off
 	.text	$9		; 2: enters from top left, closed off
@@ -167,16 +167,6 @@ innsyma	.text	$1		; 0:
 	.text	$b		; 6: enters from top left, exits bottom left
 	.text	$f		; 7: enters all left sides, closed off
 	
-innsymm	.macro			;static uint4_t innsyma = {1,5,9,13,3,7,11,15};
-	and	#$07		;inline uint4_t innsym(uint6_t a) { // on 3 lsb
-	tay			; return innsyma[a & 7];
-	lda	innsyma,y	;} // innsym()
-	.endm			;
-
-innsym	.macro
-	jsr	innsyme
-	.endm
-	
 outsyma	.text	1;,1,1,1,1,1,1,1; 000000-000111: no entries/exits in right half
 	.text	$c		; 001000-001111: upper right to left half
 	.text	$6		; 010000-010111: lower right to left half
@@ -185,14 +175,27 @@ outsyma	.text	1;,1,1,1,1,1,1,1; 000000-000111: no entries/exits in right half
 	.text	$d		; 101000-101000: right+upper right to left half
 	.text	$7		; 110000-110111: right+lower right to left half
 	.text	$f		; 111000-111111: all right entries to left half
+.endif
+	
+innsymm	.macro			;
+	and	#$07		;inline uint4_t innsym(uint6_t a) { // on 3 lsb
+	tay			;
+	lda	innsyma,y	; return innsyma[a & 7] & 0x0f /* on-VIC RAM */;
+	and	#$0f		;} // innsymm()
+	.endm			;
 
+innsym	.macro
+	jsr	innsyme
+	.endm
+	
 outsymm	.macro			;static uint4_t outsyma = {1,12,6,14,5,13,7,15};
 	lsr			;inline uint4_t outsym(uint6_t a) {
 	lsr			;
 	lsr			;
 	and	#$07		;
-	tay			; return outsym[(a & 0x38) >> 3];
-	lda	outsyma,y	;}
+	tay			; return outsym[(a & 0x38) >> 3] & 0x0f /*VIC*/;
+	lda	outsyma,y	;
+	and	#$0f		;} // outsymm()
 	.endm
 
 outsym	.macro
@@ -235,8 +238,12 @@ chckptr	.macro	delta		;
 SEEDVAL	:?= 0
 SEEDLOC	:?= 0
 	
-main	lda	#SEEDVAL	;void main(void) {
+main
+.if !VIC20NO
+	jsr	cphimem		;
+.endif
 .if SEEDLOC
+	lda	#SEEDVAL	;void main(void) {
 	sta	SEEDLOC		; *SEEDLOC = SEEDVAL;
 .endif	
 	lda	#<SBR1U		;
@@ -541,58 +548,44 @@ loop7	jsr	$ffe4		;    }
 
 +	and	#$df		;      }
 	cmp	#$1d		;     } else if ((a &= 0xdf) == 0x1d)
-	bne	+
+	bne	+		;
  	jmp	inright		;      inright();
 +	cmp	#$11		;     else if (a == 0x11)
-	bne	+
+	bne	+		;
 	jmp	indown		;      indown();
 +	cmp	#$9d		;     else if (a == 0x9d)
-	bne	+
+	bne	+		;
 	jmp	inleft		;      inleft();
 +	cmp	#$91		;     else if (a == 0x91)
-	bne	+
+	bne	+		;
 	jmp	inup		;      inup();
 +
 .if VIC20NO
 	cmp	#'d'		;     else if (a == 0x44)
-	bne	+
+	bne	+		;
  	jmp	inright		;      inright();
 +	cmp	#'s'		;     else if (a == 0x53)
-	bne	+
+	bne	+		;
 	jmp	indown		;      indown();
 +	cmp	#'a'		;     else if (a == 0x41)
-	bne	+
+	bne	+		;
 	jmp	inleft		;      inleft();
 +	cmp	#'w'		;     else if (a == 0x57)
-	bne	+
+	bne	+		;
 	jmp	inup		;      inup();
 +	cmp	#'l'		;     else if (a == 0x4c)
-	bne 	+
+	bne 	+		;
 	jmp	inright		;      inright();
 +	cmp	#'k'		;     else if (a == 0x4b)
-	bne	+
+	bne	+		;
 	jmp	indown		;      indown();
 +	cmp	#'j'		;     else if (a == 0x4a)
-	bne	+
+	bne	+		;
 	jmp	inleft		;      inleft();
 +	cmp	#'i'		;     else if (a == 0x49)
-	bne	+
-	jmp	inup		;      inup();
-+
-.endif
-	cmp	#0		;     else if (a == ' ' & 0xdf)
 	bne	+		;
-	jmp	loop2		;      break; // rotate cw through all 4 options
-
-+	cmp	#$0d		;
-	bne	++		;     else if (a == '\r') {
-	jsr	stampit		;
-	bne	+		;      if (stampit() == 0) // copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#      
-	jmp	loop;7		;       /*continue*/; // FIXME: stampit() isn't returning correctly
-+	jmp	loop		;      goto loop; // draw new tile and reveal
-	
+	jmp	inup		;      inup();
 +	cmp	#'f'		;
-.if VIC20NO
 	bne	+		;     else if (a == 0x46) {
 	lda	XHAIRC		;
 	clc			;
@@ -607,9 +600,26 @@ loop7	jsr	$ffe4		;    }
 	sta	XHAIRC		;      XHAIRC |= a; // write back
 	jmp	cyxhair		;
 
-+	cmp	#'b'		;    // switch video chip background/border colors?
++	cmp	#'b'		;     } else if (a == 0x41) { // bgnd/border clr
+
++	cmp	#$80		;     } else if (a == $a0 & 0xdf) { // ccw rot'n
+
++
 .endif
 	
+	cmp	#0		;     else if (a == ' ' & 0xdf)
+	bne	+		;
+	jmp	loop2		;      break; // rotate cw through all 4 options
+
++	cmp	#$0d		;
+	bne	++		;     else if (a == '\r') {
+	jsr	stampit		;
+	bne	+		;      if (stampit() == 0) // copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#      
+	jmp	loop;7		;       /*continue*/; // FIXME: stampit() isn't returning correctly
++	jmp	loop		;      goto loop; // draw new tile and reveal
+	
+
+
 +	cmp	#$14
 	bne	++		;
 	ldy	DECKREM		;
@@ -638,17 +648,18 @@ loop7	jsr	$ffe4		;    }
 +	cmp	#'q'		;
 	beq	+		;
 	jmp	loop7		;     } else if (a == 0x51) {
-+	lda	SCREENM+1	;
++
 .if VIC20NO
+	lda	SCREENM+1	;
 	pha			;
 	lda	SCREENM		;
 	pha			;
 	lda	#$11		;      printf("%cQ?", 0x13 /* HOME */);
 	sta	SCREENM		;      if (getchar() & 0xdf != 'y')      
-	lda	#'?'		;       numleft(); // overwrite that "Q?" prompt
+	lda	#'?'		;
 	sta	SCREENM+1	;       continue;
 .endif
--	jsr	$ffe4		;      } else
+-	jsr	$ffe4		;       else
 	beq	-		;       return;
 	and	#$df		;     }
 	tay			;
@@ -914,9 +925,9 @@ setpntb	; lda	XFLDOFS		;void setpntb(uint8_t a) { // a = XFLDOFS
 	bne	-		; POINTER += FDIM * (SCREENH - 2); // lower left
 	rts			;}
 	
-regenlr	lda	#>STL		;void regenlr(uint8_t x, uint8_t y) {
+regenlr	lda	#<STL		;void regenlr(uint8_t x, uint8_t y) {
 	sta	regensm+1	; uint8_t* dest; // x is window height, y is col
-	lda	#<STL		;
+	lda	#>STL		;
 	sta	regensm+2	; for (dest = STL; x; x--) {
 -	txa			;
 	pha			;
@@ -945,9 +956,9 @@ regensm	sta	$ffff,y		;  dest[y] = symchar[POINTER[y] /* & 0x0f */];
 	bne	-		; }
 	rts			;} // regenlr()
 
-regent	lda	#>STL		;void regent(void) {
+regent	lda	#<STL		;void regent(void) {
 	sta	regn2sm+1	; uint8_t* dest = STL /*upper left*/;
-	lda	#<STL		;
+	lda	#>STL		;
 	sta	regn2sm+2	; regentb(dest);
 	jmp	regentb		;}
 regenb	lda	#>(SBR1U+1)	;void regenb(void) {
@@ -1141,9 +1152,37 @@ copynye	copynym
 	
 	.align	FIELDSZ
 field
-.if (field <= SCREENM) && (field + FIELDSZ >= SCREENM)
-.warn "code has grown too big for unexpanded vic20"
-.endif	
+ .if (field <= SCREENM) && (field + FIELDSZ >= SCREENM)
+ .warn "code has grown too big for unexpanded vic20"
+ .endif	
+.if !VIC20NO
+innsyma	= SCREENC-(cphimem-field)
+	.text	$1		; 0: 
+	.text	$5		; 1: enters from left, closed off
+	.text	$9		; 2: enters from top left, closed off
+	.text	$d		; 3: enters from left, deflected up, closed off
+	.text	$3		; 4: enters from bottom left, close off
+	.text	$7		; 5: enters from left, deflected down, closed off
+	.text	$b		; 6: enters from top left, exits bottom left
+	.text	$f		; 7: enters all left sides, closed off
+	
+outsyma	= innsyma + * - field
+	.text	1;,1,1,1,1,1,1,1; 000000-000111: no entries/exits in right half
+	.text	$c		; 001000-001111: upper right to left half
+	.text	$6		; 010000-010111: lower right to left half
+	.text	$e		; 011000-011111: upper+lower right to left half
+	.text	$5		; 100000-100111: right to left half
+	.text	$d		; 101000-101000: right+upper right to left half
+	.text	$7		; 110000-110111: right+lower right to left half
+	.text	$f		; 111000-111111: all right entries to left half
+	
+cphimem	ldy	#cphimem-field	;
+-	lda	field-1,y	;
+	sta	innsyma-1,y	;
+	dey			;
+	bne	-		;
+	rts			;
+.endif
   	.fill	FIELDSZ
 vararea
 	
