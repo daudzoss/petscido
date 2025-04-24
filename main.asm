@@ -1,12 +1,37 @@
+.if BASIC
 *	= BASIC+1
+.else
+*	= $0002+1
+	.word	(+), 3
+	.text	$81,$41,$b2,$30	; FOR A = 0
+	.text	$a4		; TO field-start
+	.text	format("%4d",field-start)
+	.text	$3a,$dc,$30	; : BANK 0
+	.text	$3a,$42,$b2,$c2	; : B = PEEK
+	.text	$28		; ( start
+	.text	format("%2d",4096)
+	.text	$aa,$41,$29,$3a	; + A ) :
+	.text	$dc,$31,$35,$3a	; BANK 1 5 :
+	.text	$97		; POKE start
+	.text 	format("%2d",4096)
+	.text	$aa,$41,$2c,$42	; + A , B
+	.text	$3a,$82,$00	; : NEXT
++
+.endif
 	.word	(+), 2055
-	.text	$99, $22, $8e, $08, $13
+	.text	$99,$22		; PRINT "
+	.text	$09,$8e,$08,$13	; CHR$(9) CHR$(142) CHR$(8) CHR$(19)
 topline	.text	"70 left 1="
 toplin1	.text	"?  2="
 toplin2	.text	"?  3="
-toplin3	.text	"?", $22
-	.null	$3a, $9e, format("%4d", start)
+toplin3	.text	"?"
+	.text	$22,$3a,$9e	; " : SYS start
+	.null	format("%4d",start)
 +	.word 0
+.if !BASIC
+*	= $1000
+.endif
+	
 start	jmp	main
 VIC20NO	= (SCREENM != $1e00)	; many features won't fit in unexpanded vic20
 	
