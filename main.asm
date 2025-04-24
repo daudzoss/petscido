@@ -18,13 +18,15 @@
 	.text	$3a,$82,$00	; : NEXT
 +
 .endif
+DECKSIZ	= pstdeck-deck
 	.word	(+), 2055
 	.text	$99,$22		; PRINT "
 	.text	$09,$8e,$08,$93	; CHR$(9) CHR$(142) CHR$(8) CHR$(19)
-topline	.text	"70 left 1="
-toplin1	.text	"?  2="
-toplin2	.text	"?  3="
-toplin3	.text	"?"
+topline	.text	format("%2d", DECKSIZ)
+	.text	" left "
+toplin1	.text	"  =1 "
+toplin2	.text	"  =2 "
+toplin3	.text	"  =3"
 	.text	$22,$3a,$9e	; " : SYS start
 	.null	format("%4d",start)
 +	.word 0
@@ -150,7 +152,6 @@ PETSCIDA :?= 0
 	.text	$10,$1b,$2d,$04,$03,$32,$28,$1e,$2e,$11,$39,$16,$0c,$2c
 .endif
 pstdeck
-DECKSIZ	= pstdeck-deck
 	
 ;;;    2^1 2^3
 ;;; 2^0       2^5
@@ -385,7 +386,7 @@ selfmod	sta	FIELDMX		;
 	sta	CURTNUM		; CURTNUM = 1; // or 2 or 3
 
 loop	ldy	DECKREM		; for (;;) { // place a new current tile
-	beq	+		;  if (DECKREM != 0)
+	beq	+		;  if (DECKREM != 0) {
 	dey			;
 	sty	DECKREM		;
 	lda	deck,y		;
