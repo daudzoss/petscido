@@ -1041,13 +1041,22 @@ repaint	.macro	xlim=0, ylim=0	;inline void repaint(uint8_t xlim,uint8_t ylim){
 .endif
 	.endm			;} // repaint()
 
+blit_ul	blshare			;void blit_ul(uint8_t* ax_lh) { blshare(ax_lh);
+	blitter	SBR-1,SBR,STL	; blitter(SBR-1 /* SBR1U is OK too */,SBR,STL);
+	rts			;}
+	
+blit_dr	blshare			;void blit_dr(uint8_t* ax_lh) { blshare(ax_lh);
+	blitter	STL+1,STL,SBR	; blitter(STL+1 /* STL1D is OK too */,STL,SBR);
+	rts			;}
+
 inright	movptrs	+1		;void inright(void) {
 	bcs	+		; if (movptrs(+1) == 0) {
-	jmp	loop7		;  liftile();
-+	jsr	liftile		;  blitter(STL+1,STL,SBR);
-	blconst	STL+1		;
-	blitter	STL+1,STL,SBR	;
-	lda	#$20		;
+	jmp	loop7		;
++	jsr	liftile		;  liftile();
+	lda	#< (STL+1)	;  uint8_t a = (STL+1) & 0x000f;
+	ldx	#> (STL+1)	;  uint8_t x = (STL+1) >> 8;
+	jsr	blit_dr		;  blit_dr((x<<8)|a,STL,SBR);
+	lda	#$20		;//  blitter(STL+1,STL,SBR);
 	ldy	#SCREENW-1	;  wipecol(0x20, SCREENW-1); // rightmost
 	jsr	wipecol		;  repaint(-SCREENW/2,0);
 ;	repaint	-SCREENW/2,	;  goto loop1;
@@ -1056,11 +1065,12 @@ inright	movptrs	+1		;void inright(void) {
 
 indown	movptrs	+FDIM		;void indown(void) {
 	bcs	+		; if (movptrs(+FDIM) == 0) {
-	jmp	loop7		;  liftile();
-+	jsr	liftile		;  blitter(STL1D,STL,SBR);
-	blconst	STL1D		;
-	blitter	STL1D,STL,SBR	;
-	lda	#$20		;
+	jmp	loop7		;
++	jsr	liftile		;  liftile();
+	lda	#< (STL1D)	;  uint8_t a = (STL1D) & 0x000f;
+	ldx	#> (STL1D)	;  uint8_t x = (STL1D) >> 8;
+	jsr	blit_dr		;  blit_dr((x<<8)|a,STL,SBR);
+	lda	#$20		;//  blitter(STL1D,STL,SBR);
 	ldx	#SCREENH-1	;  wiperow(0x20, SCREENH-1); // bottommost
 	jsr	wiperow		;  repaint(0,-SCREENH/2-1);
 ;	repaint	,-SCREENH/2-1	;  goto loop1;
@@ -1069,11 +1079,12 @@ indown	movptrs	+FDIM		;void indown(void) {
 
 inleft	movptrs	-1		;void inleft(void) {
 	bcs	+		; if (movptrs(-1) == 0) {
-	jmp	loop7		;  liftile();
-+	jsr	liftile		;  blitter(SBR-1,SBR,STL)
-	blconst	SBR-1		;
-	blitter	SBR-1,SBR,STL	;
-	lda	#$20		;
+	jmp	loop7		;
++	jsr	liftile		;  liftile();
+	lda	#< (SBR-1)	;  uint8_t a = (SBR-1) & 0x000f;
+	ldx	#> (SBR-1)	;  uint8_t x = (SBR-1) >> 8;
+	jsr	blit_ul		;  blit_ul((x<<8)|a,STL,SBR);
+	lda	#$20		;//  blitter(SBR-1,SBR,STL)
 	ldy	#0		;  wipecol(0x20, 0); // leftmost
 	jsr	wipecol		;  repaint(+SCREENW/2-1,0);
 ;	repaint	+SCREENW/2-1,	;  goto loop1;
@@ -1082,11 +1093,12 @@ inleft	movptrs	-1		;void inleft(void) {
 
 inup	movptrs	-FDIM		;void inup(void)
 	bcs	+		; if (movptrs(-FDIM) == 0) {
-	jmp	loop7		;  liftile();
-+	jsr	liftile		;  blitter(SBR1U,SBR,STL)
-	blconst	SBR1U		;
-	blitter	SBR1U,SBR,STL	;
-	lda	#$20		;
+	jmp	loop7		;
++	jsr	liftile		;  liftile();
+	lda	#< (SBR1U)	;  uint8_t a = (SBR1U) & 0x000f;
+	ldx	#> (SBR1U)	;  uint8_t x = (SBR1U) >> 8;
+	jsr	blit_ul		;  blit_ul((x<<8)|a,STL,SBR);
+	lda	#$20		;//  blitter(SBR1U,SBR,STL)
 	ldx	#1		;  wiperow(0x20, 1); // topmost
 	jsr	wiperow		;  repaint(0,SCREENH/2);
 ;	repaint	,SCREENH/2	;  goto loop1;
