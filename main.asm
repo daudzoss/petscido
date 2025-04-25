@@ -2,6 +2,7 @@
 *	= BASIC+1
 .else
 *	= $0002+1
+COPIED2	= $0400
 	.word	(+), 3
 	.text	$81,$41,$b2,$30	; FOR A = 0
 	.text	$a4		; TO field-start
@@ -9,11 +10,11 @@
 	.text	$3a,$dc,$30	; : BANK 0
 	.text	$3a,$42,$b2,$c2	; : B = PEEK
 	.text	$28		; ( start
-	.text	format("%2d",4096)
+	.text	format("%2d",COPIED2)
 	.text	$aa,$41,$29,$3a	; + A ) :
 	.text	$dc,$31,$35,$3a	; BANK 1 5 :
 	.text	$97		; POKE start
-	.text 	format("%2d",4096)
+	.text 	format("%2d",COPIED2)
 	.text	$aa,$41,$2c,$42	; + A , B
 	.text	$3a,$82,$00	; : NEXT
 +
@@ -31,7 +32,7 @@ toplin3	.text	"  =3"
 	.null	format("%4d",start)
 +	.word 0
 .if !BASIC
-*	= $1000
+*	= COPIED2
 .endif
 
 start	jmp	main
