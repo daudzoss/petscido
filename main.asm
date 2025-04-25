@@ -33,30 +33,30 @@ toplin3	.text	"  =3"
 .if !BASIC
 *	= $1000
 .endif
-	
+
 start	jmp	main
 VIC20NO	= (SCREENM != $1e00)	; many features won't fit in unexpanded vic20
-	
+
 FDIM	= 1<<FIELDPW		;
 FIELDSZ	= FDIM*FDIM		;
 FIELDMX = field+FIELDSZ-1	; last byte of FIELDSZ-aligned region 'field'
-	
+
 INITILE	= $3e			; start with five rightmost paths open
 XHAIRPV	= SCREENW*SCREENH/2	; character to the right of screen center
 XHAIRLT	= XHAIRPV-1		; character to the left of scren center
 XHAIRRT	= XHAIRPV+1		; the initial unplaced tile position, w/ XHAIRPV
 XHAIRUP = XHAIRPV-SCREENW	;
 XHAIRDN	= XHAIRPV+SCREENW	;
-	
+
 STL	= SCREENM+SCREENW	; top-left corner (title/tile line is abovee it)
 STL1D	= SCREENM+2*SCREENW	; down 1 row from top-left corner
 SBR1U	= SCREENM+SCREENW*(SCREENH-1)-1 ; up 1 row from screen bottom-right corner
 SBR	= SCREENM+SCREENW*(SCREENH-0)-1 ; screen bottom-right corner
-	
+
 POINTER = ZP			; static void* POINTER;
 POINTR2 = ZP+2			; static void* POINTR2;
 ZP_TEMP	= ZP+4			; static uint8_t ZP_TEMP;
-	
+
 CURTILE	= vararea+$0 ;.byte ?	; static uint8_t CURTILE[4]; // shown and 2 more
 CURTIL1	= vararea+$1 ;.byte ?	;
 CURTIL2	= vararea+$2 ;.byte ?	;
@@ -70,6 +70,7 @@ DBACKUP	= vararea+$9 ;.byte ?	; static uint8_t DBACKUP;
 XFLDOFS	= vararea+$a ;.byte ?	; static uint8_t XFLDOFS; // horizontal
 YFLDOFS	= vararea+$b ;.byte ?	; static uint8_t YFLDOFS; // vertical
 DECKREM	= vararea+$c ;.byte ?	; static uint8_t DECKREM;
+
 ROTNOFS .byte	FDIM+1		; static const ROTNOFS[] = {FDIM+1,
 	.byte 	FDIM*2		;                           FDIM*2,
 	.byte 	FDIM-1		;                           FDIM-1,
@@ -78,10 +79,13 @@ TILE1AT	.byte	toplin1-topline	; static const TILESAT[] = {0, topline+10,
 TILE2AT	.byte	toplin2-topline	;                              topline+15,
 TILE3AT	.byte	toplin3-topline	;                              topline+20};
 
+.if VIC20NO
 UNRSLVD	.byte	$05		; static uint8_t UNRSLVD = 5; // INITILE's 5 1's
+.endif
+	
 FIELDC	.byte	$0		; static uint8_t FIELDC = 0; // black
 XHAIRC	.byte	$62		; static uint8_t XHAIRC = 0x62; // bright orange
-	
+
 ;;;    2^3
 ;;; 2^2   2^0
 ;;;    2^1
@@ -125,9 +129,9 @@ rot90c	.macro	decrement=0
 	bne	-		; return a;
 .endif
 	.endm			;} // rot90cw()
-	
+
 rot90cw	.macro	decrement=0
-.if \decrement == 0	
+.if \decrement == 0
 	jsr	rot90c0
 .elsif \decrement == dx
 	jsr	rot90cx
@@ -152,12 +156,12 @@ PETSCIDA :?= 0
 	.text	$10,$1b,$2d,$04,$03,$32,$28,$1e,$2e,$11,$39,$16,$0c,$2c
 .endif
 pstdeck
-	
+
 ;;;    2^1 2^3
 ;;; 2^0       2^5
 ;;;    2^2 2^4
 ;;; upper 2 msb are used for (clockwise) rotation angle
-	
+
 .if VIC20NO
 innsyma	.text	$1		; 0: 
 	.text	$5		; 1: enters from left, closed off
@@ -167,7 +171,7 @@ innsyma	.text	$1		; 0:
 	.text	$7		; 5: enters from left, deflected down, closed off
 	.text	$b		; 6: enters from top left, exits bottom left
 	.text	$f		; 7: enters all left sides, closed off
-	
+
 outsyma	.text	1;,1,1,1,1,1,1,1; 000000-000111: no entries/exits in right half
 	.text	$c		; 001000-001111: upper right to left half
 	.text	$6		; 010000-010111: lower right to left half
@@ -177,7 +181,7 @@ outsyma	.text	1;,1,1,1,1,1,1,1; 000000-000111: no entries/exits in right half
 	.text	$7		; 110000-110111: right+lower right to left half
 	.text	$f		; 111000-111111: all right entries to left half
 .endif
-	
+
 innsymm	.macro			;
 	and	#$07		;inline uint4_t innsym(uint6_t a) { // on 3 lsb
 	tay			;
@@ -188,7 +192,7 @@ innsymm	.macro			;
 innsym	.macro
 	jsr	innsyme
 	.endm
-	
+
 outsymm	.macro			;static uint4_t outsyma = {1,12,6,14,5,13,7,15};
 	lsr			;inline uint4_t outsym(uint6_t a) {
 	lsr			;
@@ -218,7 +222,7 @@ copynym	.macro
 copynyb	.macro
 	jsr	copynye
 	.endm
-	
+
 chckptr	.macro	delta		;
 	clc			;
 	lda	POINTR2		;
@@ -228,17 +232,17 @@ chckptr	.macro	delta		;
 	adc	#0		;
 	sta	1+POINTER	; POINTER = POINTR2 + delta;
 	.endm
-	
+
 	lda FIELDC		;void main(void) {
 	ldy #$e2
 -	sta SCREENC+SCREENW-1,y
 	sta SCREENC+SCREENW-1+$e2,y ; FIXME: harmless? workaround (for vic20 screen not having color already set)
 	dey
 	bne -
-	
+
 SEEDVAL	:?= 0
 SEEDLOC	:?= 0
-	
+
 main
 .if !VIC20NO
 	jsr	cphimem		;
@@ -246,7 +250,7 @@ main
 .if SEEDLOC
 	lda	#SEEDVAL	;void main(void) {
 	sta	SEEDLOC		; *SEEDLOC = SEEDVAL;
-.endif	
+.endif
 	lda	#<SBR1U		;
 	sta	POINTER		;
 	lda	#>SBR1U		;
@@ -261,7 +265,7 @@ main2	lda	FIELDC		;
 	sta	(POINTR2),y	;   POINTR2[y] = FIELDC; // dirt color
 	lda	#$1f		;
 	sta	(POINTER),y	;   POINTER[y] = 0xa0; // progress arrow
-	
+
 	txa			;
 	pha			;
 	tya			;
@@ -272,9 +276,12 @@ main2	lda	FIELDC		;
 	cmp	#DECKSIZ	;
 	bcs	-		;    ; // x now a valid index into the deck
 	tax			;
-	
-	lda	#$2		;   for (uint8_t a = 2; a; a--) { // add shuffle
+
+.if VIC20NO
+EXTRSHF	:?= 2
+	lda	#EXTRSHF	;   for (uint8_t a = EXTRSHF; a; a--) {
 main4	pha			;
+.endif
 	lda	RNDLOC1		;    for (y = (*RNDLOC1 ^ *RNDLOC2) >> 1;
 	eor	RNDLOC2		;         y >= *DECKSIZ;
 -	lsr			;         y >>= 1)
@@ -287,12 +294,12 @@ main4	pha			;
 	sta	deck,x		;    deck[x] = deck[y];
 	pla			;
 	sta	deck,y		;    deck[y] = temp;
-	
+.if VIC20NO
 	pla			;
 	sec			;
 	sbc	#1		;
 	bne	main4		;   }
-
+.endif
 	pla			;
 	tay			;
 	pla			;
@@ -338,7 +345,7 @@ selfmod	sta	FIELDMX		;
 	lda #1<<((FIELDPW-4)*2)	;           (YFLDOFS << FIELDPW) |
 	ora	#> field	;           field; // (XLFDOFS, YFLDOFS)
 	sta	1+POINTR2	;
-	
+
 	sec			;
 	lda	POINTR2		;
 	sbc	#FDIM		;
@@ -346,7 +353,7 @@ selfmod	sta	FIELDMX		;
 	lda	1+POINTR2	;
 	sbc	#0		;
 	sta	1+POINTR2	; POINTR2 -= FDIM; // (XFLDOFS, YFLDOFS-1)
-	
+
 	lda	#INITILE	;
 	innsym			;
 	copynyb			; a  = copynyb(innsym(INITILE));
@@ -370,7 +377,7 @@ selfmod	sta	FIELDMX		;
 	sta	SCREENM+XHAIRLT	; SCREENM[XHAIRLT] = a;
 	lda	FIELDC		;
 	sta	SCREENC+XHAIRLT	; SCREENC[XHAIRLT] = FIELDC; // now visible
-	
+
 	ldy	#DECKSIZ	;
 	dey			;
 	;sty	DECKREM		;
@@ -411,7 +418,7 @@ loop1	lda	SCREENM+XHAIRPV	;
 cyxhair	lda	XHAIRC		;
 	sta	SCREENC+XHAIRPV	;   SCREENC[XHAIRPV] = XHAIRC;
 	bcs	loop2		;
-	
+
 	lda	#$c0		;   // we're in a new position and in order to
 	adc	CURTILE		;   // keep the original rotation we need to
 	sta	CURTILE		;   CURTILE[0] += 0xc0; // rotate ccw before cw:
@@ -451,12 +458,12 @@ loopd	lda	CURTILE		;    }
 	clc			;
 	adc	#$40		;
 	sta	CURTILE		;    CURTILE[0] += (1 << 6);
-	
+
 	innsym			;    // depict the rotation
 	bit	CURTILE		;    a = innsym(CURTILE[0]);
 	bpl	loop5		;    switch (CURTILE[0] >> 6) {
 	bvc	loop4		;
-	
+
 	ldy	#$03		;    case 3: // 270 degrees clockwise (upward)
 	rot90cw	dy		;     a = rot90cw(a, 3);
 	tay			;
@@ -484,7 +491,7 @@ loop4	ldy	#$02		;    case 2: // 180 degrees clockwise (leftward)
 	lda	symchar,y	;     a = symchar[a];
 	sta 	SCREENM+XHAIRLT	;     SCREENM[XHAIRLT] = a;
 	jmp	loop7		;     break;
-	
+
 loop5	bvc	loop6		;    case 1: // 90 degrees clockwise (downward)
 	rot90cw			;     a = rot90cw(a, 1);
 	tay			;
@@ -591,7 +598,7 @@ loop7	jsr	$ffe4		;    }
 
 +
 .endif
-	
+
 	cmp	#0		;     else if (a == ' ' & 0xdf)
 	bne	+		;
 	jmp	loop2		;      break; // rotate cw through all 4 options
@@ -602,7 +609,7 @@ loop7	jsr	$ffe4		;    }
 	bne	+		;      if (stampit() == 0) // copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#      
 	jmp	loop;7		;       /*continue*/; // FIXME: stampit() isn't returning correctly
 +	jmp	loop		;      goto loop; // draw new tile and reveal
-	
+
 
 
 +	cmp	#$14
@@ -633,7 +640,7 @@ loop7	jsr	$ffe4		;    }
 	bne	--		;      }
 	jsr	reveal		;      reveal();
 	jmp	cyxhair		;
-	
+
 +	cmp	#'q'		;
 	beq	+		;
 	jmp	loop7		;     } else if (a == 0x51) {
@@ -681,7 +688,7 @@ reveal	ldx	#3		;void reveal(void) {
 	dex			;
 	bne	-		; }
 	rts			;} // reveal()
-	
+
 liftile	lda	PBACKUP		;void liftile(void) {
 	sta	SCREENM+XHAIRPV	; SCREENM[XHAIRPV] = PBACKUP;
 	lda	LBACKUP		;
@@ -728,7 +735,7 @@ movptrs	.macro	delta		;inline uint1_t movptrs(const int8_t delta) { // FIXME: th
 	adc	#0		;
 	sta	1+POINTR2	;  POINTR2 += FDIM;
 	sec			;  return C = 1; // proceed to scroll screen
-+	
++
 .elsif \delta == -1
 	lda	XFLDOFS		; } else if (delta == -1) {
 	cmp	#2		;  if (XFLDOFS < 2)
@@ -757,22 +764,32 @@ movptrs	.macro	delta		;inline uint1_t movptrs(const int8_t delta) { // FIXME: th
 	sta	1+POINTR2	;  POINTR2 -= FDIM;
 	sec			;  return C = 1; // proceed to scroll screen
 +
-.else	
+.else
 .error "invalid move distance ", \delta
 .endif				; }
 	.endm			;}
+
+blshare .macro			;void blshare(uint8_t* ax_src_lh) {
+	sta	(+)+11		;
+	stx	(+)+12		; // initialized self-modifying src to (x<<8)|a
++
+	.endm			;} // blshare()[blconst REPLACEMENT to save RAM]
 	
-blitter	.macro	src,dst,ends	;
+blconst	.macro	src
+	lda	# <\src		;void blconst(uint8_t* src) {
+	sta	(+)+11		;
+	lda	# >\src		; // initialized self-modifying src to src
+	sta	(+)+12		;} // blconst
++
+	.endm
+
+blitter	.macro	src,dst,ends	;// IMMEDIATELY precede with blconst()/blshare()
 .if \src < \dst
-	lda	# <\src		;void blitter(uint8_t* src, uint8_t* dst,
-	sta	(+)-2		;             uint8_t* ends) {
-	lda	# >\src		;
-	sta	(+)-1		;
-	lda	# <\dst		;
-	sta	(+)+1		;
+	lda	# <\dst		;void blitter(uint8_t* src, uint8_t* dst,
+	sta	(+)+1		;             uint8_t* ends) {
 	lda	# >\dst		;
 	sta	(+)+2		;
-	
+
 -	lda	$ffff		; do *dst-- = *src; while (src-- != ends); // 4T
 +	sta	$ffff		;} // blitter()                            //+4T
 	lda	(-)+1		;                                          //+4T
@@ -784,12 +801,12 @@ blitter	.macro	src,dst,ends	;
 	beq	+		;--+   | |                        // usually +2T
 	dec	(-)+4		;  |   | |                                 //+6T
 	jmp	-		;  |   | | // +3T=39T; ~39000T=39ms@1MHz, ~25fps
-	
+
 	;; addr for sta is $__00, addr for lda already decremented (not \ends)
 +	dec	(-)+4		;<-+   | |
 	dec	(-)+5		;      | |
 	bne	-		;      | |
-	
+
 	;; addr for lda is $__00, unknown if it is also \ends
 +	cmp	# <\ends	;<-----+ |
 	beq	++		;----+   |
@@ -799,7 +816,7 @@ blitter	.macro	src,dst,ends	;
 	beq	+		;--+ |   |
 	dec	(-)+4		;  | |   |
 	jmp	-		;  | |   |
-	
+
 	;; addr for sta is $__00, addr for lda already decremented
 +	dec	(-)+4		;<-+ |   |
 	dec	(-)+5		;    |   |
@@ -830,22 +847,18 @@ blitter	.macro	src,dst,ends	;
 	beq	+		;--+
 	dec	(-)+4		;  |
 	jmp	-		;  |
-	
+
 	;; addr for sta is $__00, addr for lda already decremented
 +	dec	(-)+4		;<-+
 	dec	(-)+5		;
 	bne	-		;
 +
 .elsif \src > \dst
-	lda	# <\src		;void blitter(uint8_t* src, uint8_t* dst,
-	sta	(+)-2		;             uint8_t* ends) {
-	lda	# >\src		;
-	sta	(+)-1		;
-	lda	# <\dst		;
-	sta	(+)+1		;
+	lda	# <\dst		;void blitter(uint8_t* src, uint8_t* dst,
+	sta	(+)+1		;             uint8_t* ends) {
 	lda	# >\dst		;
 	sta	(+)+2		;
-	
+
 -	lda	$ffff		; do *dst++ = *src; while (src++ != ends); // 4T
 +	sta	$ffff		;} // blitter()                            //+4T
 	lda	(-)+1		;                                          //+4T
@@ -873,7 +886,7 @@ blitter	.macro	src,dst,ends	;
 .error \src, " cannot equal ",\dst
 .endif
 	.endm			;
-	
+
 wipemac	.macro	rownum		;inline void wipemac(uint8_t a, uint8_t y,
 -	sta	SCREENM+(\rownum)*SCREENW-1, y;      uint8_t rownum) {
 	dey			; do { SCREENM[rownum*SCREENW + y -1] = a;
@@ -890,7 +903,7 @@ wiperow	ldy	#SCREENW	;void wiperow(uint8_t a, uint8_t x) {
 	wipemac	1		;  return;
 	rts			; default: _brk();
 +	brk			;} // wiperow()
-	
+
 wipecol
 .for r := 1, r < SCREENH, r += 1;inline void wipecol(uint8_t a, uint8_t y) {
 	sta SCREENM+r*SCREENW,y ; for (uint8_t r = 1; r < SCREENH; r++)
@@ -930,7 +943,7 @@ setpntb	; lda	XFLDOFS		;void setpntb(uint8_t a) { // a = XFLDOFS
 	dex			;
 	bne	-		; POINTER += FDIM * (SCREENH - 2); // lower left
 	rts			;}
-	
+
 regenlr	lda	#<STL		;void regenlr(uint8_t x, uint8_t y) {
 	sta	regensm+1	; uint8_t* dest; // x is window height, y is col
 	lda	#>STL		;
@@ -1027,11 +1040,12 @@ repaint	.macro	xlim=0, ylim=0	;inline void repaint(uint8_t xlim,uint8_t ylim){
  .error "either xlim or ylim must be nonzero"
 .endif
 	.endm			;} // repaint()
-	
+
 inright	movptrs	+1		;void inright(void) {
 	bcs	+		; if (movptrs(+1) == 0) {
 	jmp	loop7		;  liftile();
 +	jsr	liftile		;  blitter(STL+1,STL,SBR);
+	blconst	STL+1		;
 	blitter	STL+1,STL,SBR	;
 	lda	#$20		;
 	ldy	#SCREENW-1	;  wipecol(0x20, SCREENW-1); // rightmost
@@ -1039,11 +1053,12 @@ inright	movptrs	+1		;void inright(void) {
 ;	repaint	-SCREENW/2,	;  goto loop1;
 +	clc			; }
 	jmp	loop1		;} // inright()
-	
+
 indown	movptrs	+FDIM		;void indown(void) {
 	bcs	+		; if (movptrs(+FDIM) == 0) {
 	jmp	loop7		;  liftile();
 +	jsr	liftile		;  blitter(STL1D,STL,SBR);
+	blconst	STL1D		;
 	blitter	STL1D,STL,SBR	;
 	lda	#$20		;
 	ldx	#SCREENH-1	;  wiperow(0x20, SCREENH-1); // bottommost
@@ -1051,11 +1066,12 @@ indown	movptrs	+FDIM		;void indown(void) {
 ;	repaint	,-SCREENH/2-1	;  goto loop1;
 +	clc			; }
 	jmp	loop1		;} // indown()
-	
+
 inleft	movptrs	-1		;void inleft(void) {
 	bcs	+		; if (movptrs(-1) == 0) {
 	jmp	loop7		;  liftile();
 +	jsr	liftile		;  blitter(SBR-1,SBR,STL)
+	blconst	SBR-1		;
 	blitter	SBR-1,SBR,STL	;
 	lda	#$20		;
 	ldy	#0		;  wipecol(0x20, 0); // leftmost
@@ -1063,11 +1079,12 @@ inleft	movptrs	-1		;void inleft(void) {
 ;	repaint	+SCREENW/2-1,	;  goto loop1;
 +	clc			; }
 	jmp	loop1		;} // inleft()
-	
+
 inup	movptrs	-FDIM		;void inup(void)
 	bcs	+		; if (movptrs(-FDIM) == 0) {
 	jmp	loop7		;  liftile();
 +	jsr	liftile		;  blitter(SBR1U,SBR,STL)
+	blconst	SBR1U		;
 	blitter	SBR1U,SBR,STL	;
 	lda	#$20		;
 	ldx	#1		;  wiperow(0x20, 1); // topmost
@@ -1075,7 +1092,7 @@ inup	movptrs	-FDIM		;void inup(void)
 ;	repaint	,SCREENH/2	;  goto loop1;
 +	clc			; }
 	jmp	loop1		;} // inup()
-	
+
 angle	.macro			;inline uint2_t angle(uint8_t a) {
 	rol			;
 	rol			;
@@ -1105,7 +1122,7 @@ tofield	.macro			;inline uint8_t tofield(uint1_t out,
 	tax			;
 	lda	(POINTR2),y	; return x /*new*/, a = POINTR2[y] /*old,=0? */;
 	.endm			;}
-	
+
 stampit	lda	CURTILE		;uint8_t stampit(uint8_t a) {
 	beq	nostamp		; if ((CURTILE[0] = a) != 0) // tile not blank
 	tofield	0		;
@@ -1124,7 +1141,7 @@ stampit	lda	CURTILE		;uint8_t stampit(uint8_t a) {
 +	pla			;  }
 nostamp	lda	#0		; return 0;
 	rts			;}
-	
+
 numleft	dec	SCREENM+1	;void numleft(void) {
 	lda	SCREENM+1	; static char remain = {'6', '7'};
 	cmp	#'0'-1		; remain[1] -= 1; // decrement # remaining tiles
@@ -1155,12 +1172,12 @@ outsyme outsymm
 	rts
 copynye	copynym
 	rts
-	
+
 	.align	FIELDSZ
 field
  .if (field <= SCREENM) && (field + FIELDSZ >= SCREENM)
  .warn "code has grown too big for unexpanded vic20"
- .endif	
+ .endif
 .if !VIC20NO
 innsyma	= SCREENC-(cphimem-field)
 	.text	$1		; 0: 
@@ -1171,7 +1188,7 @@ innsyma	= SCREENC-(cphimem-field)
 	.text	$7		; 5: enters from left, deflected down, closed off
 	.text	$b		; 6: enters from top left, exits bottom left
 	.text	$f		; 7: enters all left sides, closed off
-	
+
 outsyma	= innsyma + * - field
 	.text	1;,1,1,1,1,1,1,1; 000000-000111: no entries/exits in right half
 	.text	$c		; 001000-001111: upper right to left half
@@ -1181,15 +1198,19 @@ outsyma	= innsyma + * - field
 	.text	$d		; 101000-101000: right+upper right to left half
 	.text	$7		; 110000-110111: right+lower right to left half
 	.text	$f		; 111000-111111: all right entries to left half
-	
+
 cphimem	ldy	#cphimem-field	;
--	lda	field-1,y	;
-	sta	innsyma-1,y	;
+-	lda	field-1,y	; // copy nybble arrays from field
+	sta	innsyma-1,y	; // store nybble arrays in VIC lower 512x4b RAM
 	dey			;
 	bne	-		;
+	lda	#$ea		; // NOP
+	sta	main		;
+	sta	main+1		;
+	sta	main+2		; // only can/needs to be copied to VIC once
 	rts			;
 .endif
   	.fill	FIELDSZ
 vararea
-	
+
 

@@ -13,6 +13,6 @@ petscido_c16.prg : main.asm c16/header.inc
 	rm -f header.inc; ln -s c16/header.inc; 64tass -a header.inc main.asm -L main.lst -o petscido_c16.prg
 
 clean :
-	rm -f petscido_vic20.prg petscido_c64_c128.prg petscido_vic20.prg
+	rm -f petscido_vic20.prg petscido_c64_c128.prg petscido_vic20.prg petscido_c16.prg
 
 
