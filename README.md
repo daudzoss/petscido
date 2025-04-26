@@ -4,7 +4,7 @@ An homage to a masterpiece of a solitaire game originally designed by Martin
 Nedergaard Andersen and released in 2016 by Helvetiq.  For rules refer to https://helvetiq.com/media/hexaattachment/products/attachments/bandido_rules_WEB.pdf
 (404) or better yet https://www.gameon.cafe/Pdf/GameInstructions/Bandido_EN.pdf
 
-Anyone who grew up with an Commodore or Atari computer in the 1980s immediately
+Anyone who grew up with a Commodore or Atari computer in the 1980s immediately
 recognized that the built-in low resolution graphics characters map perfectly
 onto the 1x2 tile cards.  Although scrolling around past the screen is possible,
 many games can even fit on a tiny grid of 40x25 or even 22x23 without scrolling.
@@ -40,3 +40,6 @@ DEL: discard and replace the tiles to choose from when no legal placement exists
 
 Q: quit game (then press Y to confirm or another key to cancel)
 
+![load_pestscido_sx-64](https://github.com/user-attachments/assets/1931c11e-46bf-4fcd-81a7-33c874d88b0c)
+
+![gameplay_sx-64](https://github.com/user-attachments/assets/8815314b-f4c7-4121-a632-018f487dc727)
