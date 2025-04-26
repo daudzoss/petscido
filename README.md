@@ -4,20 +4,20 @@ An homage to a masterpiece of a solitaire game originally designed by Martin
 Nedergaard Andersen and released in 2016 by Helvetiq.  For rules refer to https://helvetiq.com/media/hexaattachment/products/attachments/bandido_rules_WEB.pdf
 (404) or better yet https://www.gameon.cafe/Pdf/GameInstructions/Bandido_EN.pdf
 
-Anyone who grew up with a Commodore or Atari computer in the 1980s immediately
-recognized that the built-in low resolution graphics characters map perfectly
-onto the 1x2 tile cards.  Although scrolling around past the screen is possible,
-many games can even fit on a tiny grid of 40x25 or even 22x23 without scrolling.
+Anyone who grew up with a VIC, VIC-II or TED Commodore computer in the 1980s
+recognizes that the built-in low resolution graphics characters map perfectly
+onto the 1x2 tile cards.  Although scrolling past the screen limits is supported,
+many games can even fit on a tiny grid of 40x24 or even 22x22 at once.
 
 Requires the 64TASS assembler to build. Supports the following platforms already
 
 * unexpanded VIC-20 (with reduced error checking)
 
-* Commodore 64,SX-64,128
+* Commodore 64, SX-64, 128
 
-* Commodore 16, Plus/4 (suggest defining F1="1",F2="2",F3="3" with KEY command)
+* Commodore 16, Plus/4 (suggest defining F1="1", F2="2", F3="3" with KEY command)
 
-* Commodore P500,CBM 510 (with RAM installed in bank 15 beyond $0400 to $07ff)
+* Commodore P500, CBM 510 (with RAM installed in bank 15 beyond $0400 to $07ff)
 
 Helvetiq holds all rights to this card game, which you should purchase to
 support the original creator.  Neither entity was involved with PETSCIDO,
