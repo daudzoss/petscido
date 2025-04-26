@@ -1,3 +1,5 @@
+VIC20NO	= (SCREENM != $1e00)	; many features won't fit in unexpanded vic20
+
 .if BASIC
 *	= BASIC+1
 .else
@@ -28,6 +30,9 @@ topline	.text	format("%2d", DECKSIZ)
 toplin1	.text	"  =1 "
 toplin2	.text	"  =2 "
 toplin3	.text	"  =3"
+.if VIC20NO
+	.text	$99," rights helvetiq's"
+.endif
 	.text	$22,$3a,$9e	; " : SYS start
 	.null	format("%4d",start)
 +	.word 0
@@ -36,7 +41,6 @@ toplin3	.text	"  =3"
 .endif
 
 start	jmp	main
-VIC20NO	= (SCREENM != $1e00)	; many features won't fit in unexpanded vic20
 
 FDIM	= 1<<FIELDPW		;
 FIELDSZ	= FDIM*FDIM		;
