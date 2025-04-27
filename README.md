@@ -38,6 +38,8 @@ RETURN: place tile in the location displayed, grab a new one
 
 DEL: discard and replace the tiles to choose from when no legal placement exists
 
+HOME: go back to the starting location, useful after scrolling too far
+
 Q: quit game (then press Y to confirm or another key to cancel)
 
 ![load_pestscido_sx-64](https://github.com/user-attachments/assets/1931c11e-46bf-4fcd-81a7-33c874d88b0c)

@@ -654,6 +654,40 @@ loop7	jsr	$ffe4		;    }
 	jsr	reveal		;      reveal();
 	jmp	cyxhair		;
 
++	cmp	#$13		;     } else if (a == 0x13 /*CLR/HOME*/ {
+	bne	++++++		;
+	lda	#+~(FDIM/2)	;
+	bit	XFLDOFS		;      // works because FDIM/2 has one bit set,
+	bne	+		;
+	bit	YFLDOFS		;      // so any other values will pass the mask
+	bne	+		;
+	jmp	loop7		;      if (XFLDOFS!=FDIM/2 || YFLDOFS!=FDIM/2) {
+
++	lda	XFLDOFS		;       // move at least once, revisiting loop1:
+-	cmp	#FDIM/2		;
+	beq	++		;       while (XFLDOFS != FDIM/2)
+	bcs	+		;        if (XFLDOFS < FDIM/2) // left of center
+	jsr	inright		;         inright(); // so bump right
+	lda	XFLDOFS		;
+	bne	-		;        else // still right of center
++	jsr	inleft		;         inleft(); // so bump left
+	lda	XFLDOFS		;
+	bne	-		;
+	
++	lda	YFLDOFS		;
+-	cmp	#FDIM/2		;
+	beq	++		;       while (YFLDOFS != FDIM/2)
+	bcs	+		;        if (YFLDOFS < FDIM/2) // high of center
+	jsr	indown		;         indown(); // so bump down
+	lda	YFLDOFS		;
+	bne	-		;        else // still low of center
++	jsr	inup		;         inup(); // so bump up
+	lda	YFLDOFS		;
+	bne	-		;
+
++	clc			;       goto loop1; // redraw crosshair correctly
+	jmp	loop1		;      }
+
 +	cmp	#'q'		;
 	beq	+		;
 	jmp	loop7		;     } else if (a == 0x51) {
