@@ -653,8 +653,9 @@ loop7	jsr	$ffe4		;    }
 	bne	--		;      }
 	jsr	reveal		;      reveal();
 	jmp	cyxhair		;
-
-+	cmp	#$13		;     } else if (a == 0x13 /*CLR/HOME*/ {
++
+.if VIC20NO
+	cmp	#$13		;     } else if (a == 0x13 /*CLR/HOME*/ {
 	bne	++++++		;
 	lda	#+~(FDIM/2)	;
 	bit	XFLDOFS		;      // works because FDIM/2 has one bit set,
@@ -688,7 +689,9 @@ loop7	jsr	$ffe4		;    }
 +	clc			;       goto loop1; // redraw crosshair correctly
 	jmp	loop1		;      }
 
-+	cmp	#'q'		;
++
+.endif	
+	cmp	#'q'		;
 	beq	+		;
 	jmp	loop7		;     } else if (a == 0x51) {
 +
