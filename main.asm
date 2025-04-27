@@ -6,6 +6,8 @@ VIC20NO	= 1
 .error	"256 > 2^FIELDPW > min(SCREENH,SCREENW) violated"	
 .endif
 	
+DIRTCLR	= 0			; black
+
 .if BASIC
 *	= BASIC+1
 .else
@@ -29,17 +31,22 @@ COPIED2	= $0400
 .endif
 DECKSIZ	= pstdeck-deck
 	.word	(+), 2055
-	.text	$99,$22		; PRINT "
-	.text	$09,$8e,$08,$93	; CHR$(9) CHR$(142) CHR$(8) CHR$(19)
+	.text	$99,$22,$1f,$09	; PRINT " CHR(31) CHR$(9) // BLU,enable
+	.text	$8e,$08,$93	; CHR$(142) CHR$(8) CHR$(19) // UPPER,disabl,clr
 topline	.text	format("%2d", DECKSIZ)
 	.text	" left "
 toplin1	.text	"  =1 "
 toplin2	.text	"  =2 "
-toplin3	.text	"  =3"
+toplin3	.text	"  =3",$99
 .if VIC20NO
-	.text	$99," rights helvetiq's"
+	.text	" daudzoss/petscido"
 .endif
-;	.text	$0d,"all rights helvetiq sa"
+.if DIRTCLR
+.warning "unhandled VIC/TED color code to PETSCII conversion from ",DIRTCLR
+.else
+	.text	$90		; BLK
+.endif	
+	.text	"all rights helvetiq sa"
 	.text	$22,$3a,$9e	; " : SYS main
 	.null	format("%4d",main)
 +	.word 0
@@ -95,7 +102,7 @@ TILE3AT	.byte	toplin3-topline	;                              topline+20};
 UNRSLVD	.byte	$05		; static uint8_t UNRSLVD = 5; // INITILE's 5 1's
 .endif
 	
-FIELDC	.byte	$0		; static uint8_t FIELDC = 0; // black
+FIELDC	.byte	DIRTCLR		; static uint8_t FIELDC = DIRTCLR; // black
 XHAIRC	.byte	$62		; static uint8_t XHAIRC = 0x62; // bright orange
 
 ;;;    2^3
@@ -273,8 +280,8 @@ calls1x
 .if !VIC20NO			;
 	jsr	cphimem		; if (!VIC20NO && !called) // move consts to VIC
 .endif				;  cphimem(); // will get overwritten with NOP's
-	ldx	#SCREENH-1	; for (uint8_t x = SCREENH-1; x; x--) {
-;	ldx	#SCREENH-1	; for (uint8_t x = SCREENH-2; x; x--) {
+;	ldx	#SCREENH-1	; for (uint8_t x = SCREENH-1; x; x--) {
+	ldx	#SCREENH-2	; for (uint8_t x = SCREENH-2; x; x--) {
 main1	ldy	#SCREENW	;  for (uint8_t y = SCREENW; y; y--) {
 main2	lda	FIELDC		;
 	sta	(POINTR2),y	;   POINTR2[y] = FIELDC; // dirt color
@@ -1035,7 +1042,22 @@ regent	lda	#<STL		;void regent(void) {
 	lda	#>STL		;
 	sta	regn2sm+2	; regentb(dest);
 	jmp	regentb		;}
-regenb	lda	#<(SBR1U+1)	;void regenb(void) {
+regenb
+.if VIC20NO	
+	ldy	#$12		;
+-	lda	newmesg,y	;
+	sta	SCREENM+$16,y	;
+	dey			;
+	bne	-		;
+	beq	+		;
+newmesg	.text	$00,$12,$09,$07	;
+	.text	$08,$14,$13,$20	;
+	.text	$08,$05,$0c,$16	;
+	.text	$05,$14,$09,$11	;
+	.text	$27,$13		;
++
+.endif
+	lda	#<(SBR1U+1)	;void regenb(void) {
 	sta	regn2sm+1	; uint8_t* dest = SBR1U + 1 /*lower left*/;
 	lda	#>(SBR1U+1)	; regentb(dest);
 	sta	regn2sm+2	;}
@@ -1114,7 +1136,7 @@ inright	movptrs	+1		;void inright(void) {
 	lda	#$20		;//  blitter(STL+1,STL,SBR);
 	ldy	#SCREENW-1	;  wipecol(0x20, SCREENW-1); // rightmost
 	jsr	wipecol		;  repaint(-SCREENW/2,0);
-	repaint	-SCREENW/2,	;  goto loop1;
+	repaint	-FDIM/2,	;  goto loop1;
 +	clc			; }
 	rts			;} // inright()
 
@@ -1128,7 +1150,7 @@ indown	movptrs	+FDIM		;void indown(void) {
 	lda	#$20		;//  blitter(STL1D,STL,SBR);
 	ldx	#SCREENH-1	;  wiperow(0x20, SCREENH-1); // bottommost
 	jsr	wiperow		;  repaint(0,-SCREENH/2-1);
-	repaint	,-(SCREENH/2-1)	;  goto loop1;
+	repaint	,-(FDIM/2-1)	;  goto loop1;
 +	clc			; }
 	rts			;} // indown()
 
@@ -1142,7 +1164,7 @@ inleft	movptrs	-1		;void inleft(void) {
 	lda	#$20		;//  blitter(SBR-1,SBR,STL)
 	ldy	#0		;  wipecol(0x20, 0); // leftmost
 	jsr	wipecol		;  repaint(+SCREENW/2-1,0);
-	repaint	+(SCREENW/2-1),	;  goto loop1;
+	repaint	+(FDIM/2-1),	;  goto loop1;
 +	clc			; }
 	rts			;} // inleft()
 
@@ -1156,7 +1178,7 @@ inup	movptrs	-FDIM		;void inup(void)
 	lda	#$20		;//  blitter(SBR1U,SBR,STL)
 	ldx	#1		;  wiperow(0x20, 1); // topmost
 	jsr	wiperow		;  repaint(0,SCREENH/2);
-	repaint	,+SCREENH/2	;  goto loop1;
+	repaint	,+FDIM/2	;  goto loop1;
 +	clc			; }
 	rts			;} // inup()
 
