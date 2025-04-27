@@ -625,18 +625,15 @@ loop7	jsr	$ffe4		;    }
 -	lda	CURTILE,x	;
 	beq	+		;       if (CURTILE[x]) {
 	pha			;
-	tya			;
-	pha			;        uint8_t stack = y;
--	lda	deck-1,y	;        do {
+-	lda	deck-1,y	;        for (y = DECKREM; y; y--)
 	sta	deck,y		;         deck[y] = deck[y-1];
 	dey			;
-	bne	-		;        } while (--y);
-	pla			;
-	tay			;        y = stack;
+	bne	-		;
 	pla			;
 	sta	deck		;        deck[0] = CURTILE[x];
+	ldy	DECKREM		;
 	lda	deck,y		;
-	sta	CURTILE,x	;        CURTILE[x] = deck[DECKREM]
+	sta	CURTILE,x	;        CURTILE[x] = deck[DECKREM];
 	lda	CURTILE		;
 	and	#$c0		;        CURTILE[0] &= 0xc0; // grab rot'n bits
 	ora	CURTILE,x	;
@@ -655,7 +652,7 @@ loop7	jsr	$ffe4		;    }
 	pha			;
 	lda	SCREENM		;
 	pha			;
-	lda	#$11		;      printf("%cQ?", 0x13 /* HOME */);
+	lda	#'Q'		;      printf("%cQ?", 0x13 /* HOME */);
 	sta	SCREENM		;      if (getchar() & 0xdf != 'y')      
 	lda	#'?'		;
 	sta	SCREENM+1	;       continue;
@@ -673,9 +670,7 @@ loop7	jsr	$ffe4		;    }
 	cpy	#'y'		;   } // next rotation
 	beq	+		;  } // next position
 	jmp	loop7		; } // next tile
-+	rts			;} // main()
-
-
+;+	rts			;} // main()
 reveal	ldx	#3		;void reveal(void) {
 -	lda	CURTILE,x	; for (uint8_t x = 3; x; x--) {  
 	innsym			;
@@ -692,7 +687,7 @@ reveal	ldx	#3		;void reveal(void) {
 	sta	SCREENM,y	;  SCREENM[TILESAT[x]+1] = a; // on the screen
 	dex			;
 	bne	-		; }
-	rts			;} // reveal()
++	rts			;} // reveal()
 
 liftile	lda	PBACKUP		;void liftile(void) {
 	sta	SCREENM+XHAIRPV	; SCREENM[XHAIRPV] = PBACKUP;
@@ -905,9 +900,8 @@ wiperow	ldy	#SCREENW	;void wiperow(uint8_t a, uint8_t x) {
 	rts			;  return;
 +	cpx	#1		; case 1:
 	bne	+		;  wipemac(a, SCREENW, 1);
-	wipemac	1		;  return;
-	rts			; default: _brk();
-+	brk			;} // wiperow()
+	wipemac	1		; }
++	rts			;} // wiperow()
 
 wipecol
 .for r := 1, r < SCREENH, r += 1;inline void wipecol(uint8_t a, uint8_t y) {
