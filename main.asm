@@ -180,7 +180,7 @@ innsyma	.text	$1		; 0:
 	.text	$9		; 2: enters from top left, closed off
 	.text	$d		; 3: enters from left, deflected up, closed off
 	.text	$3		; 4: enters from bottom left, close off
-	.text	$7		; 5: enters from left, deflected down, closed off
+	.text	$7		; 5: enters from left,deflected down, closed off
 	.text	$b		; 6: enters from top left, exits bottom left
 	.text	$f		; 7: enters all left sides, closed off
 
@@ -257,8 +257,7 @@ chckptr	.macro	delta		;
 SEEDVAL	:?= 0
 SEEDLOC	:?= 0
 
-main
-	lda	#<SBR1U		;static int called=0;
+main	lda	#<SBR1U		;static int called=0;
 	sta	POINTER		;
 	lda	#>SBR1U		;void main(void) {
 	sta	1+POINTER	; POINTER = SBR1U; // one less than BL corner
@@ -271,6 +270,7 @@ main
 	sta	SEEDLOC		;  *SEEDLOC = SEEDVAL;
 .endif
 .if !VIC20NO			;
+calls1x
 	jsr	cphimem		; if (!VIC20NO && !called) // move consts to VIC
 .endif				;  cphimem(); // will get overwritten with NOP's
 	ldx	#SCREENH-1	; for (uint8_t x = SCREENH-1; x; x--) {
@@ -1254,7 +1254,7 @@ innsyma	= SCREENC-(cphimem-field)
 	.text	$9		; 2: enters from top left, closed off
 	.text	$d		; 3: enters from left, deflected up, closed off
 	.text	$3		; 4: enters from bottom left, close off
-	.text	$7		; 5: enters from left, deflected down, closed off
+	.text	$7		; 5: enters from left,deflected down, closed off
 	.text	$b		; 6: enters from top left, exits bottom left
 	.text	$f		; 7: enters all left sides, closed off
 
@@ -1268,18 +1268,16 @@ outsyma	= innsyma + * - field
 	.text	$7		; 110000-110111: right+lower right to left half
 	.text	$f		; 111000-111111: all right entries to left half
 
-cphimem	ldy	#cphimem-field	;
--	lda	field-1,y	; // copy nybble arrays from field
-	sta	innsyma-1,y	; // store nybble arrays in VIC lower 512x4b RAM
+cphimem	ldy	#cphimem-field	;void cphimem(void) {
+-	lda	field-1,y	; for (uint8_t y = 16; y; y--)
+	sta	innsyma-1,y	;  innsyma[y-1] = field[y-1]; //
 	dey			;
-	bne	-		;
-	lda	#$ea		;called = 1; // NOP
-	sta	main		;
-	sta	main+1		;
-	sta	main+2		; // only can/needs to be copied into VIC once
-	rts			;
+	bne	-		; // const nybble arrays have been copied from
+	lda	#$ea		; // field into VIC on-chip RAM in lower 512x4b
+	sta	calls1x		;
+	sta	calls1x+1	; // only can/needs to be copied into VIC once
+	sta	calls1x+2	; called = 1; // call to this replace with NOP
+	rts			;} // cphimem()
 	.fill	FIELDSZ-(*-field)
 .endif
 vararea
-
-
