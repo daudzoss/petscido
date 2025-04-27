@@ -342,7 +342,6 @@ selfmod	sta	FIELDMX		;
 	ldy	selfmod+2	;
 	cpy	# >field	; for (uint8_t* sm = FIELDMX; sm > field; sm--)
 	bcs	selfmod		;  *sm = 0; // whole field starts blanked
- brk
 	lda	#FDIM/2
 	sta	XFLDOFS		; XFLDOFS = (1<<(FIELDPW-1)); // middle of field
 	sta	YFLDOFS		; YFLDOFS = (1<<(FIELDPW-1)); // middle of field
@@ -546,42 +545,54 @@ loop7	jsr	$ffe4		;    }
 +	and	#$df		;      }
 	cmp	#$1d		;     } else if ((a &= 0xdf) == 0x1d)
 	bne	+		;
- 	jmp	inright		;      inright();
+ 	jsr	inright		;      inright();
+	jmp	loop1		;
 +	cmp	#$11		;     else if (a == 0x11)
 	bne	+		;
-	jmp	indown		;      indown();
+	jsr	indown		;      indown();
+	jmp	loop1		;
 +	cmp	#$9d		;     else if (a == 0x9d)
 	bne	+		;
-	jmp	inleft		;      inleft();
+	jsr	inleft		;      inleft();
+	jmp	loop1		;
 +	cmp	#$91		;     else if (a == 0x91)
 	bne	+		;
-	jmp	inup		;      inup();
+	jsr	inup		;      inup();
+	jmp	loop1		;
 +
 .if VIC20NO
 	cmp	#'d'		;     else if (a == 0x44)
 	bne	+		;
- 	jmp	inright		;      inright();
+ 	jsr	inright		;      inright();
 +	cmp	#'s'		;     else if (a == 0x53)
 	bne	+		;
-	jmp	indown		;      indown();
+	jsr	indown		;      indown();
+	jmp	loop1		;
 +	cmp	#'a'		;     else if (a == 0x41)
 	bne	+		;
-	jmp	inleft		;      inleft();
+	jsr	inleft		;      inleft();
+	jmp	loop1		;
 +	cmp	#'w'		;     else if (a == 0x57)
 	bne	+		;
-	jmp	inup		;      inup();
+	jsr	inup		;      inup();
+	jmp	loop1		;
 +	cmp	#'l'		;     else if (a == 0x4c)
 	bne 	+		;
-	jmp	inright		;      inright();
+	jsr	inright		;      inright();
+	jmp	loop1		;
 +	cmp	#'k'		;     else if (a == 0x4b)
 	bne	+		;
-	jmp	indown		;      indown();
+	jsr	indown		;      indown();
+	jmp	loop1		;
 +	cmp	#'j'		;     else if (a == 0x4a)
 	bne	+		;
-	jmp	inleft		;      inleft();
+	jsr	inleft		;      inleft();
+	jmp	loop1		;
 +	cmp	#'i'		;     else if (a == 0x49)
 	bne	+		;
-	jmp	inup		;      inup();
+	jsr	inup		;      inup();
+	jmp	loop1		;
+	
 +	cmp	#'f'		;
 	bne	+		;     else if (a == 0x46) {
 	lda	XHAIRC		;
@@ -647,7 +658,6 @@ loop7	jsr	$ffe4		;    }
 	beq	+		;
 	jmp	loop7		;     } else if (a == 0x51) {
 +
-.if VIC20NO
 	lda	SCREENM+1	;
 	pha			;
 	lda	SCREENM		;
@@ -656,17 +666,15 @@ loop7	jsr	$ffe4		;    }
 	sta	SCREENM		;      if (getchar() & 0xdf != 'y')      
 	lda	#'?'		;
 	sta	SCREENM+1	;       continue;
-.endif
 -	jsr	$ffe4		;       else
 	beq	-		;       return;
 	and	#$df		;     }
 	tay			;
-.if VIC20NO
 	pla			;
 	sta	SCREENM		;
 	pla			;
 	sta	SCREENM+1	;    } // next keyboard input
-.endif
+
 	cpy	#'y'		;   } // next rotation
 	beq	+		;  } // next position
 	jmp	loop7		; } // next tile
@@ -1060,7 +1068,7 @@ inright	movptrs	+1		;void inright(void) {
 	jsr	wipecol		;  repaint(-SCREENW/2,0);
 	repaint	-SCREENW/2,	;  goto loop1;
 +	clc			; }
-	jmp	loop1		;} // inright()
+	rts			;} // inright()
 
 indown	movptrs	+FDIM		;void indown(void) {
 	bcs	+		; if (movptrs(+FDIM) == 0) {
@@ -1074,7 +1082,7 @@ indown	movptrs	+FDIM		;void indown(void) {
 	jsr	wiperow		;  repaint(0,-SCREENH/2-1);
 	repaint	,-(SCREENH/2-1)	;  goto loop1;
 +	clc			; }
-	jmp	loop1		;} // indown()
+	rts			;} // indown()
 
 inleft	movptrs	-1		;void inleft(void) {
 	bcs	+		; if (movptrs(-1) == 0) {
@@ -1088,7 +1096,7 @@ inleft	movptrs	-1		;void inleft(void) {
 	jsr	wipecol		;  repaint(+SCREENW/2-1,0);
 	repaint	+(SCREENW/2-1),	;  goto loop1;
 +	clc			; }
-	jmp	loop1		;} // inleft()
+	rts			;} // inleft()
 
 inup	movptrs	-FDIM		;void inup(void)
 	bcs	+		; if (movptrs(-FDIM) == 0) {
@@ -1102,7 +1110,7 @@ inup	movptrs	-FDIM		;void inup(void)
 	jsr	wiperow		;  repaint(0,SCREENH/2);
 	repaint	,+SCREENH/2	;  goto loop1;
 +	clc			; }
-	jmp	loop1		;} // inup()
+	rts			;} // inup()
 
 angle	.macro			;inline uint2_t angle(uint8_t a) {
 	rol			;
@@ -1189,7 +1197,9 @@ field
  .if (field <= SCREENM) && (field + FIELDSZ >= SCREENM)
  .warn "code has grown too big for unexpanded vic20"
  .endif
-.if !VIC20NO
+.if VIC20NO
+  	.fill	FIELDSZ
+.else
 innsyma	= SCREENC-(cphimem-field)
 	.text	$1		; 0: 
 	.text	$5		; 1: enters from left, closed off
@@ -1220,8 +1230,8 @@ cphimem	ldy	#cphimem-field	;
 	sta	main+1		;
 	sta	main+2		; // only can/needs to be copied to VIC once
 	rts			;
+	.fill	FIELDSZ-(*-field)
 .endif
-  	.fill	FIELDSZ
 vararea
 
 
