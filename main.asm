@@ -96,7 +96,7 @@ XHAIRC	.byte	$62		; static uint8_t XHAIRC = 0x62; // bright orange
 ;;;    2^1
 ;;; upper 4 msb are masked off once that entry/exit connects to adjacent symbol
 	torch = $51
-symchar	.text	$80|$20		; 0: space, unoccupied spot in play area
+symchar	.text	$20		; 0: space, unoccupied spot in play area
 	.text	$80|torch	; 1: circle dead end, closes off escape
 	.text	$80|torch	; 2: circle dead end, closes off escape (n/a)
 	.text	$80|$55		; 3: right bending downward
@@ -962,13 +962,13 @@ setpntr	; lda	XFLDOFS		;void setpntr(uint8_t a) { // a = XFLDOFS
 	lda	YFLDOFS		;
 	sec			;
 	sbc	#SCREENH/2 - 1	;
-	sta	1+POINTER	;
 	ldx	#8-FIELDPW	;
 -	lsr			;
 	ror	POINTER		;
 	dex			;
 	bne	-		;       | (FDIM * (YFLDOFS - SCREENH / 2 + 1))
 	ora	#>field		;       | field);
+	sta	1+POINTER	;
 	rts			;} // setpntr()
 
 setpntb	; lda	XFLDOFS		;void setpntb(uint8_t a) { // a = XFLDOFS
