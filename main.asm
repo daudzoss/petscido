@@ -992,7 +992,7 @@ regenlr	lda	#<STL		;void regenlr(uint8_t x, uint8_t y) {
 -	txa			;
 	pha			;
 	lda	(POINTER),y	;
-	;and	#$0f		;
+	and	#$0f		;
 	tax			;
 	lda	symchar,x	;
 regensm	sta	$ffff,y		;  dest[y] = symchar[POINTER[y] /* & 0x0f */];
@@ -1021,13 +1021,13 @@ regent	lda	#<STL		;void regent(void) {
 	lda	#>STL		;
 	sta	regn2sm+2	; regentb(dest);
 	jmp	regentb		;}
-regenb	lda	#>(SBR1U+1)	;void regenb(void) {
+regenb	lda	#<(SBR1U+1)	;void regenb(void) {
 	sta	regn2sm+1	; uint8_t* dest = SBR1U + 1 /*lower left*/;
-	lda	#<(SBR1U+1)	; regentb(dest);
+	lda	#>(SBR1U+1)	; regentb(dest);
 	sta	regn2sm+2	;}
 regentb	ldy	#SCREENW-1	;void regentb(uint8_t* dest) {
 -	lda	(POINTER),y	; for (int8_t y = SCREENW - 1; y >= 0; y--)
-	;and	#$0f		;
+	and	#$0f		;
 	tax			;
 	lda	symchar,x	;
 regn2sm	sta	$ffff,y		;  dest[y] = symchar[POINTER[y] /* & 0x0f */];
