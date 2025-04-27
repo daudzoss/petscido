@@ -356,7 +356,7 @@ selfmod	sta	FIELDMX		;
 	sta	XFLDOFS		; XFLDOFS = (1<<(FIELDPW-1)); // middle of field
 	sta	YFLDOFS		; YFLDOFS = (1<<(FIELDPW-1)); // middle of field
 	sta	POINTR2		; POINTR2 = XFLDOFS |
-	lda #1<<((FIELDPW-4)*2)	;           (YFLDOFS << FIELDPW) |
+	lda #1<<((FIELDPW-5)*2+1);           (YFLDOFS << FIELDPW) |
 	ora	#> field	;           field; // (XLFDOFS, YFLDOFS)
 	sta	1+POINTR2	;
  ;brk
