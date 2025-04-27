@@ -342,7 +342,7 @@ selfmod	sta	FIELDMX		;
 	ldy	selfmod+2	;
 	cpy	# >field	; for (uint8_t* sm = FIELDMX; sm > field; sm--)
 	bcs	selfmod		;  *sm = 0; // whole field starts blanked
-
+ brk
 	lda	#FDIM/2
 	sta	XFLDOFS		; XFLDOFS = (1<<(FIELDPW-1)); // middle of field
 	sta	YFLDOFS		; YFLDOFS = (1<<(FIELDPW-1)); // middle of field
@@ -652,7 +652,7 @@ loop7	jsr	$ffe4		;    }
 	pha			;
 	lda	SCREENM		;
 	pha			;
-	lda	#'Q'		;      printf("%cQ?", 0x13 /* HOME */);
+	lda	#$11		;      printf("%cQ?", 0x13 /* HOME */);
 	sta	SCREENM		;      if (getchar() & 0xdf != 'y')      
 	lda	#'?'		;
 	sta	SCREENM+1	;       continue;
@@ -923,7 +923,7 @@ setpntr	; lda	XFLDOFS		;void setpntr(uint8_t a) { // a = XFLDOFS
 	sta	1+POINTER	;
 	ldx	#8-FIELDPW	;
 -	lsr			;
-	ror			;
+	ror	POINTER		;
 	dex			;
 	bne	-		;       | (FDIM * (YFLDOFS - SCREENH / 2 + 1))
 	ora	#>field		;       | field);
@@ -941,7 +941,7 @@ setpntb	; lda	XFLDOFS		;void setpntb(uint8_t a) { // a = XFLDOFS
 	sta	1+POINTER	;
 	dex			;
 	bne	-		; POINTER += FDIM * (SCREENH - 2); // lower left
-	rts			;}
+	rts			;} // setpntb()
 
 regenlr	lda	#<STL		;void regenlr(uint8_t x, uint8_t y) {
 	sta	regensm+1	; uint8_t* dest; // x is window height, y is col
@@ -995,11 +995,11 @@ regn2sm	sta	$ffff,y		;  dest[y] = symchar[POINTER[y] /* & 0x0f */];
 	rts			;} // regenlr()
 
 repaint	.macro	xlim=0, ylim=0	;inline void repaint(uint8_t xlim,uint8_t ylim){
-.if xlim			; if (xlim) {
- .if xlim < 0			;  if (xlim < 0) {
+.if \xlim			; if (xlim) {
+ .if \xlim < 0			;  if (xlim < 0) {
 	lda	XFLDOFS		;   // regenerate right edge from field
-	cmp	#xlim		;
-	bcs	+		;   if (XFLDOFS < xlim) {
+	cmp	#-\xlim		;
+	bcs	+		;   if (XFLDOFS < abs(xlim)) {
 	jsr	setpntr		;    setpntr(XFLDOFS);
 	ldy	#SCREENW-1	;
 	ldx	#SCREENH	;    regenlr(SCREENH, SCREENW-1);
@@ -1007,7 +1007,7 @@ repaint	.macro	xlim=0, ylim=0	;inline void repaint(uint8_t xlim,uint8_t ylim){
 +
  .else				;  } else {
 	lda	XFLDOFS		;   // regenerate left edge from field
-	cmp	#xlim+1		;
+	cmp	#\xlim+1		;
 	bcc	+		;   if (XFLDOFS > xlim) {
 	jsr	setpntr		;    setpntr(XFLDOFS);
 	ldy	#0		;
@@ -1015,11 +1015,11 @@ repaint	.macro	xlim=0, ylim=0	;inline void repaint(uint8_t xlim,uint8_t ylim){
 	jsr	regenlr		;   }
 +
  .endif				;  } 
-.elsif ylim			; } else if (ylim) {
- .if ylim < 0			;  if (ylim < 0) {
+.elsif \ylim			; } else if (ylim) {
+ .if \ylim < 0			;  if (ylim < 0) {
 	lda	YFLDOFS		;   // regenerate bottom edge from field
-	cmp	#ylim		;
-	bcs	+		;   if (YFLDOFS < ylim) {
+	cmp	#-\ylim		;
+	bcs	+		;   if (YFLDOFS < abs(ylim)) {
 	lda	XFLDOFS		;
 	jsr	setpntb		;    setpntb(XFLDOFS); // special case
 	ldy	#SCREENW	;    regenb();
@@ -1027,7 +1027,7 @@ repaint	.macro	xlim=0, ylim=0	;inline void repaint(uint8_t xlim,uint8_t ylim){
 +
  .else
 	lda	YFLDOFS		;   // regenerate top edge from field
-	cmp	#ylim+1		;
+	cmp	#\ylim+1		;
 	bcc	+		;   if (YFLDOFS > ylim) {
 	lda	XFLDOFS		;
 	jsr	setpntr		;    setpntr(XFLDOFS);
@@ -1041,11 +1041,11 @@ repaint	.macro	xlim=0, ylim=0	;inline void repaint(uint8_t xlim,uint8_t ylim){
 	.endm			;} // repaint()
 
 blit_ul	blshare			;void blit_ul(uint8_t* ax_lh) { blshare(ax_lh);
-	blitter	SBR-1,SBR,STL	; blitter(SBR-1 /* SBR1U is OK too */,SBR,STL);
+	blitter	SBR-1,SBR,STL	; blitter(SBR-1 /* SBR1U is equiv. */,SBR,STL);
 	rts			;}
 	
 blit_dr	blshare			;void blit_dr(uint8_t* ax_lh) { blshare(ax_lh);
-	blitter	STL+1,STL,SBR	; blitter(STL+1 /* STL1D is OK too */,STL,SBR);
+	blitter	STL+1,STL,SBR	; blitter(STL+1 /* STL1D is equiv. */,STL,SBR);
 	rts			;}
 
 inright	movptrs	+1		;void inright(void) {
@@ -1058,7 +1058,7 @@ inright	movptrs	+1		;void inright(void) {
 	lda	#$20		;//  blitter(STL+1,STL,SBR);
 	ldy	#SCREENW-1	;  wipecol(0x20, SCREENW-1); // rightmost
 	jsr	wipecol		;  repaint(-SCREENW/2,0);
-;	repaint	-SCREENW/2,	;  goto loop1;
+	repaint	-SCREENW/2,	;  goto loop1;
 +	clc			; }
 	jmp	loop1		;} // inright()
 
@@ -1072,7 +1072,7 @@ indown	movptrs	+FDIM		;void indown(void) {
 	lda	#$20		;//  blitter(STL1D,STL,SBR);
 	ldx	#SCREENH-1	;  wiperow(0x20, SCREENH-1); // bottommost
 	jsr	wiperow		;  repaint(0,-SCREENH/2-1);
-;	repaint	,-SCREENH/2-1	;  goto loop1;
+	repaint	,-(SCREENH/2-1)	;  goto loop1;
 +	clc			; }
 	jmp	loop1		;} // indown()
 
@@ -1086,7 +1086,7 @@ inleft	movptrs	-1		;void inleft(void) {
 	lda	#$20		;//  blitter(SBR-1,SBR,STL)
 	ldy	#0		;  wipecol(0x20, 0); // leftmost
 	jsr	wipecol		;  repaint(+SCREENW/2-1,0);
-;	repaint	+SCREENW/2-1,	;  goto loop1;
+	repaint	+(SCREENW/2-1),	;  goto loop1;
 +	clc			; }
 	jmp	loop1		;} // inleft()
 
@@ -1100,7 +1100,7 @@ inup	movptrs	-FDIM		;void inup(void)
 	lda	#$20		;//  blitter(SBR1U,SBR,STL)
 	ldx	#1		;  wiperow(0x20, 1); // topmost
 	jsr	wiperow		;  repaint(0,SCREENH/2);
-;	repaint	,SCREENH/2	;  goto loop1;
+	repaint	,+SCREENH/2	;  goto loop1;
 +	clc			; }
 	jmp	loop1		;} // inup()
 
