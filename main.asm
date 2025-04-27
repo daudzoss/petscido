@@ -269,8 +269,8 @@ main	lda	#<SBR1U		;static int called=0;
 	lda	#SEEDVAL	; if (SEEDLOC)
 	sta	SEEDLOC		;  *SEEDLOC = SEEDVAL;
 .endif
-.if !VIC20NO			;
 calls1x
+.if !VIC20NO			;
 	jsr	cphimem		; if (!VIC20NO && !called) // move consts to VIC
 .endif				;  cphimem(); // will get overwritten with NOP's
 	ldx	#SCREENH-1	; for (uint8_t x = SCREENH-1; x; x--) {
