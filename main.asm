@@ -1,9 +1,15 @@
-VIC20NO	= (SCREENM != $1e00)	; many features won't fit in unexpanded vic20
-
+.if FIELDPW == 5		; many features won't fit in unexpanded vic20
+VIC20NO	= 0
+.elsif FIELDPW == 6
+VIC20NO	= 1
+.else
+.error	"256 > 2^FIELDPW > min(SCREENH,SCREENW) violated"	
+.endif
+	
 .if BASIC
 *	= BASIC+1
 .else
-*	= $0002+1
+*	= $0002+1		; P500 loads into bank 0 but must run in bank 15
 COPIED2	= $0400
 	.word	(+), 3
 	.text	$81,$41,$b2,$30	; FOR A = 0
@@ -33,16 +39,17 @@ toplin3	.text	"  =3"
 .if VIC20NO
 	.text	$99," rights helvetiq's"
 .endif
-	.text	$22,$3a,$9e	; " : SYS start
-	.null	format("%4d",start)
+;	.text	$0d,"all rights helvetiq sa"
+	.text	$22,$3a,$9e	; " : SYS main
+	.null	format("%4d",main)
 +	.word 0
 .if !BASIC
 *	= COPIED2
 .endif
 
-start	jmp	main
+start
 
-FDIM	= 1<<FIELDPW		;
+FDIM	= 1<<FIELDPW		; must be either 64 (4K field) or 32 (1K field)
 FIELDSZ	= FDIM*FDIM		;
 FIELDMX = field+FIELDSZ-1	; last byte of FIELDSZ-aligned region 'field'
 
@@ -76,9 +83,9 @@ XFLDOFS	= vararea+$a ;.byte ?	; static uint8_t XFLDOFS; // horizontal
 YFLDOFS	= vararea+$b ;.byte ?	; static uint8_t YFLDOFS; // vertical
 DECKREM	= vararea+$c ;.byte ?	; static uint8_t DECKREM;
 
-ROTNOFS .byte	FDIM+1		; static const ROTNOFS[] = {FDIM+1,
-	.byte 	FDIM*2		;                           FDIM*2,
-	.byte 	FDIM-1		;                           FDIM-1,
+ROTNOFS .byte	FDIM+1		; static const ROTNOFS[] = {FDIM+1, //R is 1D 1R
+	.byte 	FDIM*2		;                           FDIM*2, //D is 2D
+	.byte 	FDIM-1		;                           FDIM-1, //L is 1D 1L
 TILESAT	.byte	0		;                           0};// shared with..
 TILE1AT	.byte	toplin1-topline	; static const TILESAT[] = {0, topline+10,
 TILE2AT	.byte	toplin2-topline	;                              topline+15,
@@ -116,7 +123,7 @@ symchar	.text	$20		; 0: space, unoccupied spot in play area
 dx = 1
 dy = 2
 rot90c	.macro	decrement=0
-	and	#$0f		;inline uint8_t rot90cw(uint4_t a,
+	and	#$0f		;inline uint8_t rot90c(uint4_t a,
 .if \decrement
 -	clc			;                       uint2_t y) { // nyb rot
 .else
@@ -133,7 +140,7 @@ rot90c	.macro	decrement=0
 	.endif
 	bne	-		; return a;
 .endif
-	.endm			;} // rot90cw()
+	.endm			;} // rot90c()
 
 rot90cw	.macro	decrement=0
 .if \decrement == 0
@@ -228,6 +235,7 @@ copynyb	.macro
 	jsr	copynye
 	.endm
 
+.if 0
 chckptr	.macro	delta		;
 	clc			;
 	lda	POINTR2		;
@@ -244,27 +252,29 @@ chckptr	.macro	delta		;
 	sta SCREENC+SCREENW-1+$e2,y ; FIXME: harmless? workaround (for vic20 screen not having color already set)
 	dey
 	bne -
+.endif
 
 SEEDVAL	:?= 0
 SEEDLOC	:?= 0
 
 main
-.if !VIC20NO
-	jsr	cphimem		;
-.endif
-.if SEEDLOC
-	lda	#SEEDVAL	;void main(void) {
-	sta	SEEDLOC		; *SEEDLOC = SEEDVAL;
-.endif
-	lda	#<SBR1U		;
+	lda	#<SBR1U		;static int called=0;
 	sta	POINTER		;
-	lda	#>SBR1U		;
+	lda	#>SBR1U		;void main(void) {
 	sta	1+POINTER	; POINTER = SBR1U; // one less than BL corner
 	lda	#<(SBR1U-SCREENM+SCREENC)
 	sta	POINTR2		;
 	lda	#>(SBR1U-SCREENM+SCREENC)
 	sta	1+POINTR2	; POINTR2 = SBR1U+(SCREENC-SCREENM); // colormem
-	ldx	#SCREENH-1	; for (uint8_t x = SCREENH; x; x--) {
+.if SEEDLOC
+	lda	#SEEDVAL	; if (SEEDLOC)
+	sta	SEEDLOC		;  *SEEDLOC = SEEDVAL;
+.endif
+.if !VIC20NO			;
+	jsr	cphimem		; if (!VIC20NO && !called) // move consts to VIC
+.endif				;  cphimem(); // will get overwritten with NOP's
+	ldx	#SCREENH-1	; for (uint8_t x = SCREENH-1; x; x--) {
+;	ldx	#SCREENH-1	; for (uint8_t x = SCREENH-2; x; x--) {
 main1	ldy	#SCREENW	;  for (uint8_t y = SCREENW; y; y--) {
 main2	lda	FIELDC		;
 	sta	(POINTR2),y	;   POINTR2[y] = FIELDC; // dirt color
@@ -349,7 +359,7 @@ selfmod	sta	FIELDMX		;
 	lda #1<<((FIELDPW-4)*2)	;           (YFLDOFS << FIELDPW) |
 	ora	#> field	;           field; // (XLFDOFS, YFLDOFS)
 	sta	1+POINTR2	;
-
+ ;brk
 	sec			;
 	lda	POINTR2		;
 	sbc	#FDIM		;
@@ -357,12 +367,13 @@ selfmod	sta	FIELDMX		;
 	lda	1+POINTR2	;
 	sbc	#0		;
 	sta	1+POINTR2	; POINTR2 -= FDIM; // (XFLDOFS, YFLDOFS-1)
-
+ ;brk
 	lda	#INITILE	;
 	innsym			;
 	copynyb			; a  = copynyb(innsym(INITILE));
 	ldy	#FDIM-2	;
 	sta	(POINTR2),y	; POINTR2[FDIM - 2] = a; // (XFLDOFS-2, YFLDOFS)
+ ;brk
 	and	#$0f		;
 	tay			;
 	lda	symchar,y	; a = symchar[a & 0x0f];
@@ -374,7 +385,7 @@ selfmod	sta	FIELDMX		;
 	outsym			;
 	copynyb			; a = copynyb(outsym(INITILE));
 	ldy	#FDIM-1	;
-	sta	(POINTR2),y	; POINTR2[FDIM - 0] = a; // (XLFDOFS-1, YFLDOFS)
+	sta	(POINTR2),y	; POINTR2[FDIM - 1] = a; // (XLFDOFS-1, YFLDOFS)
 	and	#$0f		;
 	tay			;
 	lda	symchar,y	; a = symchar[a & 0x0f];
@@ -1157,8 +1168,8 @@ angle	.macro			;inline uint2_t angle(uint8_t a) {
 	.endm			;}
 
 tofield	.macro			;inline uint8_t tofield(uint1_t out,
-	lda	CURTILE		;                       register uint8_t* x,
-	.if \1			;                       register uint8_t* y) {
+	lda	CURTILE		;                       register uint8_t& x,
+	.if \1			;                       register uint8_t& y) {
 	outsym			;
 	.else			; uint8_t a;
 	innsym			; a = out ? outsym(CURTILE[0]) : innsym(CURTILE[0]);
@@ -1213,7 +1224,7 @@ numleft	dec	SCREENM+1	;void numleft(void) {
 	rts			;
 +	cmp	#' '-1		;  else if (remain[0] < ' ')
 	bne	+		;   _brk();
-	brk			; }
+;	brk			; }
 +	rts			;} // numleft()
 
 rot90c0	rot90c
@@ -1262,10 +1273,10 @@ cphimem	ldy	#cphimem-field	;
 	sta	innsyma-1,y	; // store nybble arrays in VIC lower 512x4b RAM
 	dey			;
 	bne	-		;
-	lda	#$ea		; // NOP
+	lda	#$ea		;called = 1; // NOP
 	sta	main		;
 	sta	main+1		;
-	sta	main+2		; // only can/needs to be copied to VIC once
+	sta	main+2		; // only can/needs to be copied into VIC once
 	rts			;
 	.fill	FIELDSZ-(*-field)
 .endif
