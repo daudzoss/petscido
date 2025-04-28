@@ -736,7 +736,28 @@ loop7	jsr	$ffe4		;    }
 	sta	SCREENM+1	;    } // next keyboard input
 
 	cpy	#'y' & $df	;   } // next rotation
-	beq	+		;  } // next position
+;	beq	+		;  } // next position
+ beq	+++
+ tya	
+ lsr
+ lsr
+ lsr
+ lsr
+ ora #'0' 
+ cmp #'9'+1
+ bcc +
+ sec
+ sbc #'9'
++ sta SCREENM
+ tya	
+ and #$0f
+ ora #'0' 
+ cmp #'9'+1
+ bcc +
+ sec
+ sbc #'9'
++ sta SCREENM+1
+
 	jmp	loop7		; } // next tile
 ;+	rts			;} // main()
 reveal	ldx	#3		;void reveal(void) {
