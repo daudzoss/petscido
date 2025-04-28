@@ -15,8 +15,8 @@ DIRTCLR	= 0			; black
 COPIED2	= $0400
 	.word	(+), 3
 	.text	$81,$41,$b2,$30	; FOR A = 0
-	.text	$a4		; TO field-start
-	.text	format("%4d",field-start)
+	.text	$a4		; TO prefld-start
+	.text	format("%4d",prefld-start)
 	.text	$3a,$dc,$30	; : BANK 0
 	.text	$3a,$42,$b2,$c2	; : B = PEEK
 	.text	$28		; ( start
@@ -266,7 +266,12 @@ chckptr	.macro	delta		;
 SEEDVAL	:?= 0
 SEEDLOC	:?= 0
 
-main	lda	#<SBR1U		;static int called=0;
+main
+.if !BASIC
+	lda	#$0f
+	sta	$01
+.endif
+	lda	#<SBR1U		;static int called=0;
 	sta	POINTER		;
 	lda	#>SBR1U		;void main(void) {
 	sta	1+POINTER	; POINTER = SBR1U; // one less than BL corner
@@ -1294,7 +1299,7 @@ outsyme outsymm
 	rts
 copynye	copynym
 	rts
-
+prefld
 	.align	FIELDSZ
 field
  .if (field <= SCREENM) && (field + FIELDSZ >= SCREENM)
