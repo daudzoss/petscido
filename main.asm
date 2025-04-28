@@ -644,7 +644,7 @@ loop7	jsr	$ffe4		;    }
 	bne	++		;     else if (a == '\r') {
 	jsr	stampit		;
 	bne	+		;      if (stampit() == 0) // copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#      
-	jmp	loop;7		;       /*continue*/; // FIXME: stampit() isn't returning correctly
+	jmp	loop7		;       continue; // FIXME?: stampit() isn't returning correctly
 +	jmp	loop		;      goto loop; // draw new tile and reveal
 
 
@@ -734,7 +734,7 @@ loop7	jsr	$ffe4		;    }
 	pla			;
 	sta	SCREENM+1	;    } // next keyboard input
 
-	cpy	#'y'		;   } // next rotation
+	cpy	#'y' & $df	;   } // next rotation
 	beq	+		;  } // next position
 	jmp	loop7		; } // next tile
 ;+	rts			;} // main()
@@ -1020,7 +1020,7 @@ regenlr	lda	#<STL		;void regenlr(uint8_t x, uint8_t y) {
 	and	#$0f		;
 	tax			;
 	lda	symchar,x	;
-regensm	sta	$ffff,y		;  dest[y] = symchar[POINTER[y] /* & 0x0f */];
+regensm	sta	$ffff,y		;  dest[y] = symchar[POINTER[y] & 0x0f];
 	clc			;
 	lda	POINTER		;
 	adc	#FDIM		;
@@ -1048,7 +1048,7 @@ regent	lda	#<STL		;void regent(void) {
 	jmp	regentb		;}
 regenb
 .if VIC20NO	
-	ldy	#$12		;
+	ldy	#$11		;
 -	lda	newmesg,y	;
 	sta	SCREENM+$16,y	;
 	dey			;
@@ -1070,7 +1070,7 @@ regentb	ldy	#SCREENW-1	;void regentb(uint8_t* dest) {
 	and	#$0f		;
 	tax			;
 	lda	symchar,x	;
-regn2sm	sta	$ffff,y		;  dest[y] = symchar[POINTER[y] /* & 0x0f */];
+regn2sm	sta	$ffff,y		;  dest[y] = symchar[POINTER[y] & 0x0f ];
 	dey			;
 	bpl	-		;
 	rts			;} // regentb()
