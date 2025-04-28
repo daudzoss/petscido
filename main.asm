@@ -366,7 +366,7 @@ selfmod	sta	FIELDMX		;
 	lda #1<<((FIELDPW-5)*2+1);           (YFLDOFS << FIELDPW) |
 	ora	#> field	;           field; // (XLFDOFS, YFLDOFS)
 	sta	1+POINTR2	;
- ;brk
+
 	sec			;
 	lda	POINTR2		;
 	sbc	#FDIM		;
@@ -374,13 +374,13 @@ selfmod	sta	FIELDMX		;
 	lda	1+POINTR2	;
 	sbc	#0		;
 	sta	1+POINTR2	; POINTR2 -= FDIM; // (XFLDOFS, YFLDOFS-1)
- ;brk
+
 	lda	#INITILE	;
 	innsym			;
 	copynyb			; a  = copynyb(innsym(INITILE));
 	ldy	#FDIM-2	;
 	sta	(POINTR2),y	; POINTR2[FDIM - 2] = a; // (XFLDOFS-2, YFLDOFS)
- ;brk
+
 	and	#$0f		;
 	tay			;
 	lda	symchar,y	; a = symchar[a & 0x0f];
@@ -538,6 +538,7 @@ loop6	and	#$0f		;    case 0: default: // unrotated (rightward)
 	sta	SCREENM+XHAIRRT	;     SCREENM[XHAIRRT] = a;
 
 loop7	jsr	$ffe4		;    }
+	cmp	#$00		;
 	beq	loop7		;    while ((a = getchar()) { // keyboard loop
 	cmp	#'1'		;
 	beq	+		;
@@ -627,6 +628,8 @@ loop7	jsr	$ffe4		;    }
 	jmp	cyxhair		;
 
 +	cmp	#'b'		;     } else if (a == 0x41) { // bgnd/border clr
+ bne	+		;
+ brk
 
 +	cmp	#$80		;     } else if (a == $a0 & 0xdf) { // ccw rot'n
 
@@ -722,6 +725,7 @@ loop7	jsr	$ffe4		;    }
 	lda	#'?'		;
 	sta	SCREENM+1	;       continue;
 -	jsr	$ffe4		;       else
+	cmp	#$00		;
 	beq	-		;       return;
 	and	#$df		;     }
 	tay			;
@@ -770,7 +774,7 @@ liftile	lda	PBACKUP		;void liftile(void) {
 	sta	SCREENC+XHAIRDN	; SCREENC[XHAIRDN] = FIELDC;
 	rts			;} // liftile()
 
-movptrs	.macro	delta		;inline uint1_t movptrs(const int8_t delta) { // FIXME: these waste an enormous moat merely by insisting no non-field squares appear onscreen
+movptrs	.macro	delta		;inline uint1_t movptrs(const int8_t delta) {
 .if \delta == +1
 	lda	#FDIM-2		; if (delta == +1) {
 	cmp	XFLDOFS		;  if (XFLDOFS >= FDIM-2)
@@ -1067,10 +1071,9 @@ regentb	ldy	#SCREENW-1	;void regentb(uint8_t* dest) {
 	tax			;
 	lda	symchar,x	;
 regn2sm	sta	$ffff,y		;  dest[y] = symchar[POINTER[y] /* & 0x0f */];
-	clc			;
 	dey			;
 	bpl	-		;
-	rts			;} // regenlr()
+	rts			;} // regentb()
 
 repaint	.macro	xlim=0, ylim=0	;inline void repaint(uint8_t xlim,uint8_t ylim){
 .if \xlim			; if (xlim) {
@@ -1126,6 +1129,11 @@ blit_dr	blshare			;void blit_dr(uint8_t* ax_lh) { blshare(ax_lh);
 	blitter	STL+1,STL,SBR	; blitter(STL+1 /* STL1D is equiv. */,STL,SBR);
 	rts			;}
 
+CATCHLT	= (SCREENW/2)		; if XFLDOFS < CATCHLT no new L col to bring in
+CATCHRT	= (FDIM-(SCREENW/2)-1)	; if XFLDOFS > CATCHRT no new R col to bring in
+CATCHUP	= (SCREENH/2)		; if YFLDOFS < CATCHUP no new T row to bring in
+CATCHDN	= (FDIM-(SCREENH/2)-1)	; if YFLDOFS > CATCHDN no new B row to bring in
+
 inright	movptrs	+1		;void inright(void) {
 	bcs	+		; if (movptrs(+1) == 0) {
 	jmp	loop7		;
@@ -1136,7 +1144,7 @@ inright	movptrs	+1		;void inright(void) {
 	lda	#$20		;//  blitter(STL+1,STL,SBR);
 	ldy	#SCREENW-1	;  wipecol(0x20, SCREENW-1); // rightmost
 	jsr	wipecol		;  repaint(-SCREENW/2,0);
-	repaint	-FDIM/2,	;  goto loop1;
+	repaint	-CATCHRT,	;  goto loop1;
 +	clc			; }
 	rts			;} // inright()
 
@@ -1150,7 +1158,7 @@ indown	movptrs	+FDIM		;void indown(void) {
 	lda	#$20		;//  blitter(STL1D,STL,SBR);
 	ldx	#SCREENH-1	;  wiperow(0x20, SCREENH-1); // bottommost
 	jsr	wiperow		;  repaint(0,-SCREENH/2-1);
-	repaint	,-(FDIM/2-1)	;  goto loop1;
+	repaint	,-CATCHDN	;  goto loop1;
 +	clc			; }
 	rts			;} // indown()
 
@@ -1164,7 +1172,7 @@ inleft	movptrs	-1		;void inleft(void) {
 	lda	#$20		;//  blitter(SBR-1,SBR,STL)
 	ldy	#0		;  wipecol(0x20, 0); // leftmost
 	jsr	wipecol		;  repaint(+SCREENW/2-1,0);
-	repaint	+(FDIM/2-1),	;  goto loop1;
+	repaint	+CATCHLT,	;  goto loop1;
 +	clc			; }
 	rts			;} // inleft()
 
@@ -1178,7 +1186,7 @@ inup	movptrs	-FDIM		;void inup(void)
 	lda	#$20		;//  blitter(SBR1U,SBR,STL)
 	ldx	#1		;  wiperow(0x20, 1); // topmost
 	jsr	wiperow		;  repaint(0,SCREENH/2);
-	repaint	,+FDIM/2	;  goto loop1;
+	repaint	,+CATCHUP	;  goto loop1;
 +	clc			; }
 	rts			;} // inup()
 
