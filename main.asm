@@ -1020,7 +1020,7 @@ setpntr	; lda	XFLDOFS		;void setpntr(uint8_t a) { // a = XFLDOFS
 
 setpntb	; lda	XFLDOFS		;void setpntb(uint8_t a) { // a = XFLDOFS
 	jsr	setpntr		; setpntr(a);
-	ldx	#SCREENH-1	; // set POINTER to overlap the field with the
+	ldx	#SCREENH-2	; // set POINTER to overlap the field with the
 -	clc			; // screen square at the lower-left corner
 	lda	POINTER		; // of the screen
 	adc	#FDIM		;
