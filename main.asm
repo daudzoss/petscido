@@ -1049,6 +1049,9 @@ regent	lda	#<STL		;void regent(void) {
 	jmp	regentb		;}
 regenb
 .if VIC20NO	
+	lda	SCREENM+$26	;
+	cmp	apostro		;
+	beq	+		;
 	ldy	#$11		;
 -	lda	newmesg,y	;
 	sta	SCREENM+$16,y	;
@@ -1059,7 +1062,7 @@ newmesg	.text	$00,$12,$09,$07	;
 	.text	$08,$14,$13,$20	;
 	.text	$08,$05,$0c,$16	;
 	.text	$05,$14,$09,$11	;
-	.text	$27,$13		;
+apostro	.text	$27,$13		;
 +
 .endif
 	lda	#<(SBR1U+1)	;void regenb(void) {
