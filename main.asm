@@ -1,7 +1,7 @@
-.if FIELDPW == 5		; many features won't fit in unexpanded vic20
+.if FIELDPW == 5
 VIC20NO	= 0
 .elsif FIELDPW == 6
-VIC20NO	= 1
+VIC20NO	= 1			; many features won't fit in unexpanded vic20
 .else
 .error	"256 > 2^FIELDPW > min(SCREENH,SCREENW) violated"	
 .endif
@@ -67,6 +67,9 @@ XHAIRRT	= XHAIRPV+1		; the initial unplaced tile position, w/ XHAIRPV
 XHAIRUP = XHAIRPV-SCREENW	;
 XHAIRDN	= XHAIRPV+SCREENW	;
 
+FIRSTLT	= XHAIRPV+3*SCREENW-2	; initial (5-exit tile) position below crosshair
+FIRSTRT	= XHAIRPV+3*SCREENW-1
+
 STL	= SCREENM+SCREENW	; top-left corner (title/tile line is abovee it)
 STL1D	= SCREENM+2*SCREENW	; down 1 row from top-left corner
 SBR1U	= SCREENM+SCREENW*(SCREENH-1)-1 ; up 1 row from screen bottom-right corner
@@ -74,7 +77,6 @@ SBR	= SCREENM+SCREENW*(SCREENH-0)-1 ; screen bottom-right corner
 
 POINTER = ZP			; static void* POINTER;
 POINTR2 = ZP+2			; static void* POINTR2;
-ZP_TEMP	= ZP+4			; static uint8_t ZP_TEMP;
 
 CURTILE	= vararea+$0 ;.byte ?	; static uint8_t CURTILE[4]; // shown and 2 more
 CURTIL1	= vararea+$1 ;.byte ?	;
@@ -280,7 +282,6 @@ calls1x
 .if !VIC20NO			;
 	jsr	cphimem		; if (!VIC20NO && !called) // move consts to VIC
 .endif				;  cphimem(); // will get overwritten with NOP's
-;	ldx	#SCREENH-1	; for (uint8_t x = SCREENH-1; x; x--) {
 	ldx	#SCREENH-2	; for (uint8_t x = SCREENH-2; x; x--) {
 main1	ldy	#SCREENW	;  for (uint8_t y = SCREENW; y; y--) {
 main2	lda	FIELDC		;
@@ -378,27 +379,27 @@ selfmod	sta	FIELDMX		;
 	lda	#INITILE	;
 	innsym			;
 	copynyb			; a  = copynyb(innsym(INITILE));
-	ldy	#FDIM-2	;
-	sta	(POINTR2),y	; POINTR2[FDIM - 2] = a; // (XFLDOFS-2, YFLDOFS)
+	ldy	#4*FDIM-2	;
+	sta	(POINTR2),y	; POINTR2[4*FDIM-2] = a; //(XFLDOFS-2,YFLDOFS+3)
 
 	and	#$0f		;
 	tay			;
 	lda	symchar,y	; a = symchar[a & 0x0f];
-	sta   SCREENM+XHAIRLT-1	; SCREENM[XHAIRLT-1] = a;
+	sta	SCREENM+FIRSTLT	; SCREENM[FIRSTLT] = a;
 	lda	FIELDC		;
-	sta   SCREENC+XHAIRLT-1	; SCREENC[XHAIRLT-1] = FIELDC; // now visible
+	sta	SCREENC+FIRSTLT	; SCREENC[FIRSTLT] = FIELDC; // now visible
 
 	lda	#INITILE	;
 	outsym			;
 	copynyb			; a = copynyb(outsym(INITILE));
-	ldy	#FDIM-1	;
-	sta	(POINTR2),y	; POINTR2[FDIM - 1] = a; // (XLFDOFS-1, YFLDOFS)
+	ldy	#4*FDIM-1	;
+	sta	(POINTR2),y	; POINTR2[4*FDIM-1] = a; //(XLFDOFS-1,YFLDOFS+3)
 	and	#$0f		;
 	tay			;
 	lda	symchar,y	; a = symchar[a & 0x0f];
-	sta	SCREENM+XHAIRLT	; SCREENM[XHAIRLT] = a;
+	sta	SCREENM+FIRSTRT	; SCREENM[XHAIRLT] = a;
 	lda	FIELDC		;
-	sta	SCREENC+XHAIRLT	; SCREENC[XHAIRLT] = FIELDC; // now visible
+	sta	SCREENC+FIRSTRT	; SCREENC[XHAIRLT] = FIELDC; // now visible
 
 	ldy	#DECKSIZ	;
 	dey			;
@@ -1039,6 +1040,7 @@ regensm	sta	$ffff,y		;  dest[y] = symchar[POINTER[y] & 0x0f];
 	tax			;
 	dex			;
 	bne	-		; }
+ brk
 	rts			;} // regenlr()
 
 regent	lda	#<STL		;void regent(void) {
@@ -1083,7 +1085,7 @@ repaint	.macro	xlim=0, ylim=0	;inline void repaint(uint8_t xlim,uint8_t ylim){
 	bcs	+		;   if (XFLDOFS < abs(xlim)) {
 	jsr	setpntr		;    setpntr(XFLDOFS);
 	ldy	#SCREENW-1	;
-	ldx	#SCREENH	;    regenlr(SCREENH, SCREENW-1);
+	ldx	#SCREENH-1	;    regenlr(SCREENH-1/*see below*/, SCREENW-1);
 	jsr	regenlr		;   }
 +
  .else				;  } else {
@@ -1092,7 +1094,7 @@ repaint	.macro	xlim=0, ylim=0	;inline void repaint(uint8_t xlim,uint8_t ylim){
 	bcc	+		;   if (XFLDOFS > xlim) {
 	jsr	setpntr		;    setpntr(XFLDOFS);
 	ldy	#0		;
-	ldx	#SCREENH	;    regenlr(SCREENH, 0);
+	ldx	#SCREENH-1	;    regenlr(SCREENH-1 /*top row skipped*/, 0);
 	jsr	regenlr		;   }
 +
  .endif				;  } 
