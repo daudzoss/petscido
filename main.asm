@@ -1040,7 +1040,6 @@ regensm	sta	$ffff,y		;  dest[y] = symchar[POINTER[y] & 0x0f];
 	tax			;
 	dex			;
 	bne	-		; }
- brk
 	rts			;} // regenlr()
 
 regent	lda	#<STL		;void regent(void) {
