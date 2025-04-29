@@ -568,58 +568,70 @@ loop7	jsr	$ffe4		;    }
 	jmp	cyxhair		;      goto cyxhair;
 
 +	and	#$df		;      }
-	cmp	#$1d		;     } else if ((a &= 0xdf) == 0x1d)
+	cmp	#$1d		;     } else if ((a &= 0xdf) == 0x1d) {
 	bne	+		;
+	jsr	liftile		;      liftile();
  	jsr	inright		;      inright();
 	jmp	loop1		;
-+	cmp	#$11		;     else if (a == 0x11)
++	cmp	#$11		;     } else if (a == 0x11) {
 	bne	+		;
+	jsr	liftile		;      liftile();
 	jsr	indown		;      indown();
 	jmp	loop1		;
-+	cmp	#$9d		;     else if (a == 0x9d)
++	cmp	#$9d		;     } else if (a == 0x9d) {
 	bne	+		;
+	jsr	liftile		;      liftile();
 	jsr	inleft		;      inleft();
 	jmp	loop1		;
-+	cmp	#$91		;     else if (a == 0x91)
++	cmp	#$91		;     } else if (a == 0x91) {
 	bne	+		;
+	jsr	liftile		;      liftile();
 	jsr	inup		;      inup();
 	jmp	loop1		;
 +
 .if VIC20NO
-	cmp	#'d'		;     else if (a == 0x44)
+	cmp	#'d'		;     } else if (a == 0x44) {
 	bne	+		;
+	jsr	liftile		;      liftile();
  	jsr	inright		;      inright();
-+	cmp	#'s'		;     else if (a == 0x53)
++	cmp	#'s'		;     } else if (a == 0x53) {
 	bne	+		;
+	jsr	liftile		;      liftile();
 	jsr	indown		;      indown();
 	jmp	loop1		;
-+	cmp	#'a'		;     else if (a == 0x41)
++	cmp	#'a'		;     } else if (a == 0x41) {
 	bne	+		;
+	jsr	liftile		;      liftile();
 	jsr	inleft		;      inleft();
 	jmp	loop1		;
-+	cmp	#'w'		;     else if (a == 0x57)
++	cmp	#'w'		;     } else if (a == 0x57){
 	bne	+		;
+	jsr	liftile		;      liftile();
 	jsr	inup		;      inup();
 	jmp	loop1		;
-+	cmp	#'l'		;     else if (a == 0x4c)
++	cmp	#'l'		;     } else if (a == 0x4c) {
 	bne 	+		;
+	jsr	liftile		;      liftile();
 	jsr	inright		;      inright();
 	jmp	loop1		;
-+	cmp	#'k'		;     else if (a == 0x4b)
++	cmp	#'k'		;     } else if (a == 0x4b) {
 	bne	+		;
+	jsr	liftile		;      liftile();
 	jsr	indown		;      indown();
 	jmp	loop1		;
-+	cmp	#'j'		;     else if (a == 0x4a)
++	cmp	#'j'		;     } else if (a == 0x4a) {
 	bne	+		;
+	jsr	liftile		;      liftile();
 	jsr	inleft		;      inleft();
 	jmp	loop1		;
-+	cmp	#'i'		;     else if (a == 0x49)
++	cmp	#'i'		;     } else if (a == 0x49) {
 	bne	+		;
+	jsr	liftile		;      liftile();
 	jsr	inup		;      inup();
 	jmp	loop1		;
 	
 +	cmp	#'f'		;
-	bne	+		;     else if (a == 0x46) {
+	bne	+		;     } else if (a == 0x46) {
 	lda	XHAIRC		;
 	clc			;
 	adc	#1		;
@@ -642,12 +654,12 @@ loop7	jsr	$ffe4		;    }
 +
 .endif
 
-	cmp	#0		;     else if (a == ' ' & 0xdf)
+	cmp	#0		;     } else if (a == ' ' & 0xdf) {
 	bne	+		;
 	jmp	loop2		;      break; // rotate cw through all 4 options
 
 +	cmp	#$0d		;
-	bne	++		;     else if (a == '\r') {
+	bne	++		;     } else if (a == '\r') {
 	jsr	stampit		;
 	bne	+		;      if (stampit() == 0) // copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#      
 	jmp	loop7		;       continue; // FIXME?: stampit() isn't returning correctly
@@ -691,7 +703,9 @@ loop7	jsr	$ffe4		;    }
 	bne	+		;
 	jmp	loop7		;      if (XFLDOFS!=FDIM/2 || YFLDOFS!=FDIM/2) {
 
-+	lda	XFLDOFS		;       // move at least once, revisiting loop1:
++	jsr	liftile		;       liftile();
+
+	lda	XFLDOFS		;       // move at least once, revisiting loop1:
 -	cmp	#FDIM/2		;
 	beq	++		;       while (XFLDOFS != FDIM/2)
 	bcs	+		;        if (XFLDOFS < FDIM/2) // left of center
@@ -741,28 +755,29 @@ loop7	jsr	$ffe4		;    }
 	sta	SCREENM+1	;    } // next keyboard input
 
 	cpy	#'y' & $df	;   } // next rotation
-;	beq	+		;  } // next position
- beq	+++
- tya	
- lsr
- lsr
- lsr
- lsr
- ora #'0' 
- cmp #'9'+1
- bcc +
- sec
- sbc #'9'
-+ sta SCREENM
- tya	
- and #$0f
- ora #'0' 
- cmp #'9'+1
- bcc +
- sec
- sbc #'9'
-+ sta SCREENM+1
+	beq	+		;  } // next position
 
+;;	beq	+		;  } // next position
+; beq	+++
+; tya	
+; lsr
+; lsr
+; lsr
+; lsr
+; ora #'0' 
+; cmp #'9'+1
+; bcc +
+; sec
+; sbc #'9'
+;+ sta SCREENM
+; tya	
+; and #$0f
+; ora #'0' 
+; cmp #'9'+1
+; bcc +
+; sec
+; sbc #'9'
+;+ sta SCREENM+1
 	jmp	loop7		; } // next tile
 ;+	rts			;} // main()
 reveal	ldx	#3		;void reveal(void) {
@@ -1166,57 +1181,53 @@ CATCHDN	= (FDIM-(SCREENH/2)-1)	; if YFLDOFS > CATCHDN no new B row to bring in
 
 inright	movptrs	+1		;void inright(void) {
 	bcs	+		; if (movptrs(+1) == 0) {
-	jmp	loop7		;
-+	jsr	liftile		;  liftile();
-	lda	#< (STL+1)	;  uint8_t a = (STL+1) & 0x000f;
+	rts			;
++	lda	#< (STL+1)	;  uint8_t a = (STL+1) & 0x000f;
 	ldx	#> (STL+1)	;  uint8_t x = (STL+1) >> 8;
 	jsr	blit_dr		;  blit_dr((x<<8)|a,STL,SBR);
 	lda	#$20		;//  blitter(STL+1,STL,SBR);
-	ldy	#SCREENW-1	;  wipecol(0x20, SCREENW-1); // rightmost
-	jsr	wipecol		;  repaint(-SCREENW/2,0);
-	repaint	-CATCHRT,	;  goto loop1;
+	ldy	#SCREENW-1	;
+	jsr	wipecol		;  wipecol(0x20, SCREENW-1); // rightmost
+	repaint	-CATCHRT,	;  repaint(-SCREENW/2,0);
 +	clc			; }
 	rts			;} // inright()
 
 indown	movptrs	+FDIM		;void indown(void) {
 	bcs	+		; if (movptrs(+FDIM) == 0) {
-	jmp	loop7		;
-+	jsr	liftile		;  liftile();
-	lda	#< (STL1D)	;  uint8_t a = (STL1D) & 0x000f;
+	rts			;
++	lda	#< (STL1D)	;  uint8_t a = (STL1D) & 0x000f;
 	ldx	#> (STL1D)	;  uint8_t x = (STL1D) >> 8;
 	jsr	blit_dr		;  blit_dr((x<<8)|a,STL,SBR);
 	lda	#$20		;//  blitter(STL1D,STL,SBR);
-	ldx	#SCREENH-1	;  wiperow(0x20, SCREENH-1); // bottommost
-	jsr	wiperow		;  repaint(0,-SCREENH/2-1);
-	repaint	,-CATCHDN	;  goto loop1;
+	ldx	#SCREENH-1	;
+	jsr	wiperow		;  wiperow(0x20, SCREENH-1); // bottommost
+	repaint	,-CATCHDN	;  repaint(0,-SCREENH/2-1);
 +	clc			; }
 	rts			;} // indown()
 
 inleft	movptrs	-1		;void inleft(void) {
 	bcs	+		; if (movptrs(-1) == 0) {
-	jmp	loop7		;
-+	jsr	liftile		;  liftile();
-	lda	#< (SBR-1)	;  uint8_t a = (SBR-1) & 0x000f;
+	rts			;
++	lda	#< (SBR-1)	;  uint8_t a = (SBR-1) & 0x000f;
 	ldx	#> (SBR-1)	;  uint8_t x = (SBR-1) >> 8;
 	jsr	blit_ul		;  blit_ul((x<<8)|a,STL,SBR);
 	lda	#$20		;//  blitter(SBR-1,SBR,STL)
-	ldy	#0		;  wipecol(0x20, 0); // leftmost
-	jsr	wipecol		;  repaint(+SCREENW/2-1,0);
-	repaint	+CATCHLT,	;  goto loop1;
+	ldy	#0		;
+	jsr	wipecol		;  wipecol(0x20, 0); // leftmost
+	repaint	+CATCHLT,	;  repaint(+SCREENW/2-1,0);
 +	clc			; }
 	rts			;} // inleft()
 
 inup	movptrs	-FDIM		;void inup(void)
 	bcs	+		; if (movptrs(-FDIM) == 0) {
-	jmp	loop7		;
-+	jsr	liftile		;  liftile();
-	lda	#< (SBR1U)	;  uint8_t a = (SBR1U) & 0x000f;
+	rts			;
++	lda	#< (SBR1U)	;  uint8_t a = (SBR1U) & 0x000f;
 	ldx	#> (SBR1U)	;  uint8_t x = (SBR1U) >> 8;
 	jsr	blit_ul		;  blit_ul((x<<8)|a,STL,SBR);
 	lda	#$20		;//  blitter(SBR1U,SBR,STL)
-	ldx	#1		;  wiperow(0x20, 1); // topmost
-	jsr	wiperow		;  repaint(0,SCREENH/2);
-	repaint	,+CATCHUP	;  goto loop1;
+	ldx	#1		;
+	jsr	wiperow		;  wiperow(0x20, 1); // topmost
+	repaint	,+CATCHUP	;  repaint(0,SCREENH/2);
 +	clc			; }
 	rts			;} // inup()
 
