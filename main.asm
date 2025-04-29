@@ -59,6 +59,9 @@ start
 FDIM	= 1<<FIELDPW		; must be either 64 (4K field) or 32 (1K field)
 FIELDSZ	= FDIM*FDIM		;
 FIELDMX = field+FIELDSZ-1	; last byte of FIELDSZ-aligned region 'field'
+FHIBITS	= (16 - 2 * FIELDPW)	; 6 => 4, 5 => 6 [and 8-FHIBITS 6 => 4, 5 => 2]
+FHIMASK	= ~((1<<(8-FHIBITS))-1)	; 6 => 11110000==-15, 5 => 11111100==-3
+FIELDHI	= FHIMASK & > field	; 6 => XXXX0000, 5 = XXXXXX00
 
 INITILE	= $3e			; start with five rightmost paths open
 XHAIRPV	= SCREENW*SCREENH/2	; character to the right of screen center
@@ -245,16 +248,6 @@ copynyb	.macro
 	.endm
 
 .if 0
-chckptr	.macro	delta		;
-	clc			;
-	lda	POINTR2		;
-	adc	#\delta		;
-	sta	POINTER		;
-	lda	1+POINTR2	;
-	adc	#0		;
-	sta	1+POINTER	; POINTER = POINTR2 + delta;
-	.endm
-
 	lda FIELDC		;void main(void) {
 	ldy #$e2
 -	sta SCREENC+SCREENW-1,y
@@ -365,6 +358,12 @@ selfmod	sta	FIELDMX		;
 	ldy	selfmod+2	;
 	cpy	# >field	; for (uint8_t* sm = FIELDMX; sm > field; sm--)
 	bcs	selfmod		;  *sm = 0; // whole field starts blanked
+	
+	ldy	#SCREENW	;
+-	sta	FIELDMX,y	;
+	dey			; for (uint8_t yval = SCREENW; yval; yval--)
+	bne	-		;  FIELDMX[y] = 0; // and SCREENW bytes beyond
+	
 	lda	#FDIM/2
 	sta	XFLDOFS		; XFLDOFS = (1<<(FIELDPW-1)); // middle of field
 	sta	YFLDOFS		; YFLDOFS = (1<<(FIELDPW-1)); // middle of field
@@ -656,14 +655,13 @@ loop7	jsr	$ffe4		;    }
 	sta	XHAIRC		;      XHAIRC |= a; // write back
 	jmp	cyxhair		;
 
-+	cmp	#'b'		;     } else if (a == 0x41) { // bgnd/border clr
- bne	+		;
- brk
-
 +	cmp	#$80		;     } else if (a == $a0 & 0xdf) { // ccw rot'n
-
+	
 +
 .endif
+	cmp	#'b'		;     } else if (a == 0x41) { // bgnd/border clr
+	bne	+		;
+	brk			;      return; // user break (for now)
 
 	cmp	#0		;     } else if (a == ' ' & 0xdf) {
 	bne	+		;
@@ -887,7 +885,7 @@ movptrs	.macro	delta		;inline uint1_t movptrs(const int8_t delta) {
 .else
 .error "invalid move distance ", \delta
 .endif				; }
-	.endm			;}
+	.endm			;} // movptrs()
 
 blshare .macro			;void blshare(uint8_t* ax_src_lh) {
 	sta	(+)+11		;
@@ -1039,7 +1037,7 @@ setpntr	; lda	XFLDOFS		;void setpntr(uint8_t a) { // a = XFLDOFS
 	sta	POINTER		; POINTER = (void*) ((XFLDOFS - SCREENW/2)
 	lda	YFLDOFS		;
 	sec			;
-	sbc	#SCREENH/2 - 1	;
+	sbc	#SCREENH/2; - 1	;
 	ldx	#8-FIELDPW	;
 -	lsr			;
 	ror	POINTER		;
@@ -1048,6 +1046,28 @@ setpntr	; lda	XFLDOFS		;void setpntr(uint8_t a) { // a = XFLDOFS
 	ora	#>field		;       | field);
 	sta	1+POINTER	;
 	rts			;} // setpntr()
+
+.if 0
+setp_lr	; lda	XFLDOFS		;void setpntr(uint8_t a) { // a = XFLDOFS
+	sec			; // set POINTER to overlap the field with the
+	sbc	#SCREENW/2	; // screen square below the upper-left corner
+	ldx	#8-FIELDPW	; // of the screen
+-	asl			;
+	dex			;
+	bne	-		;
+	sta	POINTER		; POINTER = (void*) ((XFLDOFS - SCREENW/2)
+	lda	YFLDOFS		;
+	sec			;
+	sbc	#SCREENH/2; - 1	;
+	ldx	#8-FIELDPW	;
+-	lsr			;
+	ror	POINTER		;
+	dex			;
+	bne	-		;       | (FDIM * (YFLDOFS - SCREENH / 2 + 1))
+	ora	#>field		;       | field);
+	sta	1+POINTER	;
+	rts			;} // setpntr()
+.endif
 
 setpntb	; lda	XFLDOFS		;void setpntb(uint8_t a) { // a = XFLDOFS
 	jsr	setpntr		; setpntr(a);
@@ -1066,15 +1086,25 @@ setpntb	; lda	XFLDOFS		;void setpntb(uint8_t a) { // a = XFLDOFS
 regenlr	lda	#<STL		;void regenlr(uint8_t x, uint8_t y) {
 	sta	regensm+1	; uint8_t* dest; // x is window height, y is col
 	lda	#>STL		;
-	sta	regensm+2	; for (dest = STL; x; x--) {
--	txa			;
+	sta	regensm+2	;
+
+-	txa			; for (dest = STL; x; x--) {
 	pha			;
 	lda	(POINTER),y	;
 	and	#$0f		;
 	tax			;
-	lda	symchar,x	;
-regensm	sta	$ffff,y		;  dest[y] = symchar[POINTER[y] & 0x0f];
-	clc			;
+	
+	lda	1+POINTER	;
+	and	#+FHIMASK	;
+	cmp	#FIELDHI	;
+	bne	+		;  if (POINTER & FHIMASK == FIELDHI) // overrun
+	
+	lda	symchar,x	;   // confirmed we are looking at in-field byte
+regensm	sta	$ffff,y		;   dest[y] = symchar[POINTER[y] & 0x0f];
+; cpx #$0
+; beq +
+; brk
++	clc			;
 	lda	POINTER		;
 	adc	#FDIM		;
 	sta	POINTER		;
@@ -1090,6 +1120,7 @@ regensm	sta	$ffff,y		;  dest[y] = symchar[POINTER[y] & 0x0f];
 	sta	regensm+2	;  dest += SCREENW;
 	pla			;
 	tax			;
+
 	dex			;
 	bne	-		; }
 	rts			;} // regenlr()
@@ -1122,6 +1153,12 @@ apostro	.text	$27,$13		;
 	lda	#>(SBR1U+1)	; regentb(dest);
 	sta	regn2sm+2	;}
 regentb	ldy	#SCREENW-1	;void regentb(uint8_t* dest) {
+	
+	lda	1+POINTER	;
+	and	#+FHIMASK	;
+	cmp	#FIELDHI	;  if (POINTER & FHIMASK != FIELDHI) // overrun!
+	bne	+		;   break; // started stomping on non-field bits
+	
 -	lda	(POINTER),y	; for (int8_t y = SCREENW - 1; y >= 0; y--)
 	and	#$0f		;
 	tax			;
@@ -1129,7 +1166,7 @@ regentb	ldy	#SCREENW-1	;void regentb(uint8_t* dest) {
 regn2sm	sta	$ffff,y		;  dest[y] = symchar[POINTER[y] & 0x0f ];
 	dey			;
 	bpl	-		;
-	rts			;} // regentb()
++	rts			;} // regentb()
 
 repaint	.macro	xlim=0, ylim=0	;inline void repaint(uint8_t xlim,uint8_t ylim){
 .if \xlim			; if (xlim) {
@@ -1362,4 +1399,5 @@ cphimem	ldy	#cphimem-field	;void cphimem(void) {
 	rts			;} // cphimem()
 	.fill	FIELDSZ-(*-field)
 .endif
+	.fill	SCREENW		; bandaid to mitigate (POINTER),Y when Y<SCREENW
 vararea
