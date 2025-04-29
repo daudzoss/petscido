@@ -421,8 +421,19 @@ selfmod	sta	FIELDMX		;
 	sta	CURTNUM		; CURTNUM = 1; // or 2 or 3
 
 loop	ldy	DECKREM		; for (;;) { // place a new current tile
-	beq	+		;  if (DECKREM != 0) {
-	dey			;
+	
+	bne	+		;  if (DECKREM == 0) { // take last 3 until gone
+	tya			;
+	ldy	CURTNUM		;
+	sta	CURTILE,y	;   CURTILE[CURTNUM] = 0;
+	ldx	#$03		;
+-	lda	CURTILE,x	;   for (register uint8_t x = 3; x; x--) {
+	stx	CURTNUM		;    CURTNUM = x;
+	bne	++		;    if (CURTILE[x])
+	dex			;     break; // still at least one remaining
+	bne	-		;   }
+	rts			;   if (!CURTILE[x]) return; // empty, game lost
++	dey			;  } else {
 	sty	DECKREM		;
 	lda	deck,y		;
 	ldy	CURTNUM		;
