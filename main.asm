@@ -663,7 +663,7 @@ loop7	jsr	$ffe4		;    }
 	bne	+		;
 	brk			;      return; // user break (for now)
 
-	cmp	#0		;     } else if (a == ' ' & 0xdf) {
++	cmp	#0		;     } else if (a == ' ' & 0xdf) {
 	bne	+		;
 	jmp	loop2		;      break; // rotate cw through all 4 options
 
