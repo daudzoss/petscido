@@ -1042,7 +1042,7 @@ setpntr	; lda	XFLDOFS		;void setpntr(uint8_t a) { // a = XFLDOFS
 -	lsr			;
 	ror	POINTER		;
 	dex			;
-	bne	-		;       | (FDIM * (YFLDOFS - SCREENH / 2 + 1))
+	bne	-		;       | (FDIM * (YFLDOFS - SCREENH / 2))//+1))
 	ora	#>field		;       | field);
 	sta	1+POINTER	;
 	rts			;} // setpntr()
@@ -1058,7 +1058,7 @@ setp_lr	; lda	XFLDOFS		;void setpntr(uint8_t a) { // a = XFLDOFS
 	sta	POINTER		; POINTER = (void*) ((XFLDOFS - SCREENW/2)
 	lda	YFLDOFS		;
 	sec			;
-	sbc	#SCREENH/2; - 1	;
+	sbc	#SCREENH/2 - 1	;
 	ldx	#8-FIELDPW	;
 -	lsr			;
 	ror	POINTER		;
