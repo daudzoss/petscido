@@ -1369,12 +1369,12 @@ copynye	copynym
 prefld
 	.align	FIELDSZ
 field
- .if (field <= SCREENM) && (field + FIELDSZ >= SCREENM)
- .warn "code has grown too big for unexpanded vic20"
- .endif
 .if VIC20NO
   	.fill	FIELDSZ
 .else
+ .if (field <= SCREENM) && (field + FIELDSZ >= SCREENM)
+ .warn "code has grown too big for unexpanded vic20"
+ .endif
 innsyma	= SCREENC-(cphimem-field)
 	.text	$1		; 0: 
 	.text	$5		; 1: enters from left, closed off
@@ -1407,5 +1407,6 @@ cphimem	ldy	#cphimem-field	;void cphimem(void) {
 	rts			;} // cphimem()
 	.fill	FIELDSZ-(*-field)
 .endif
-	.fill	SCREENW		; bandaid to mitigate (POINTER),Y when Y<SCREENW
+
+	.fill	SCREENW		; bandaid mitigates (POINTER),Y when 0<Y<SCREENW
 vararea
