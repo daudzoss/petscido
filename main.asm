@@ -7,6 +7,7 @@ VIC20NO	= 1			; many features won't fit in unexpanded vic20
 .endif
 	
 DIRTCLR	= 0			; black
+NOTDIRT	= 1			; white
 
 .if BASIC
 *	= BASIC+1
@@ -62,10 +63,10 @@ FIELDMX = field+FIELDSZ-1	; last byte of FIELDSZ-aligned region 'field'
 FHIBITS	= (16 - 2 * FIELDPW)	; 6 => 4, 5 => 6 [and 8-FHIBITS 6 => 4, 5 => 2]
 FHIMASK	= ~((1<<(8-FHIBITS))-1)	; 6 => 11110000==-15, 5 => 11111100==-3
 FIELDHI	= FHIMASK & > field	; 6 => XXXX0000, 5 = XXXXXX00
-MAGIC	= (SCREENW/2) + ((SCREENH-1)/2-1)*FDIM
+MAGIC	= (SCREENW/2) + ((SCREENH-1)/2 -2)*FDIM
 
 INITILE	= $3e			; start with five rightmost paths open
-XHAIRPV	= SCREENW*SCREENH/2+SCREENW	; character to the right of screen center
+XHAIRPV	= SCREENW*SCREENH/2	; character to the right of screen center
 XHAIRLT	= XHAIRPV-1		; character to the left of screen center
 XHAIRRT	= XHAIRPV+1		; the initial unplaced tile position, w/ XHAIRPV
 XHAIRUP = XHAIRPV-SCREENW	;
@@ -554,7 +555,15 @@ loop6	and	#$0f		;    case 0: default: // unrotated (rightward)
 	lda	symchar,y	;     a = symchar[a];
 	sta	SCREENM+XHAIRRT	;     SCREENM[XHAIRRT] = a;
 
-loop7	jsr	$ffe4		;    }
+loop7
+.if BKGRNDC
+	lda	#NOTDIRT	;
+	cmp	BKGRNDC		;
+	beq	+		;
+	sta	BKGRNDC		;
++
+.endif
+	jsr	$ffe4		;    }
 	cmp	#$00		;
 	beq	loop7		;    while ((a = getchar()) { // keyboard loop
 	cmp	#'1'		;
@@ -671,8 +680,19 @@ loop7	jsr	$ffe4		;    }
 +	cmp	#$0d		;
 	bne	++		;     } else if (a == '\r') {
 	jsr	stampit		;
-	bne	+		;      if (stampit() == 0) // copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#      
-	jmp	loop7		;       continue; // FIXME?: stampit() isn't returning correctly?
+	bne	+		;      if (stampit() == 0) { // copies tile into (both nybbles of) corresponding two field squares, FIXME: later must return signed delta conn#      
+.if BKGRNDC
+	lda	#DIRTCLR	;       if (BKGRNDC) *BKGRNDC = DIRTCLR;//flashed
+	sta	BKGRNDC		;       continue; // FIXME?: stampit() isn't returning correctly?
+	lda	#0		;
+	tay			;
+	tax			;
+-	dex			;
+	bne	-		;
+	dey			;
+	bne	-		;
+.endif
+	jmp	loop7		;      }
 +	jmp	loop		;      goto loop; // draw new tile and reveal
 
 
@@ -1034,7 +1054,7 @@ setpntr	sec			;void setpntr(void) { // a = XFLDOFS
 	sbc	# < MAGIC	;
 	sta	POINTER		; POINTER = POINTR2 // one above (FDIM/2,FDIM/2)
 	lda	1+POINTR2	;           - SCREENW/2 // left of that
-	sbc	# > MAGIC	;           - (((SCREENH-1)/2-1)*FDIM);
+	sbc	# > MAGIC	;           - (((SCREENH-1)/2 + 1)*FDIM);
 	sta	1+POINTER	;
 	rts			;} // setpntr()
 .else

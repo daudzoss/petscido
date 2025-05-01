@@ -13,9 +13,9 @@ Requires the 64TASS assembler to build. Supports the following platforms already
 
 * unexpanded VIC-20 (with reduced error checking)
 
-* Commodore 64, SX-64, 128
+* Commodore 64, SX-64
 
-* Commodore 16, Plus/4 (suggest defining F1="1", F2="2", F3="3" with KEY command)
+* Commodore Plus/4, 16 (suggest defining F1="1" F2="2" F3="3" with KEY command)
 
 * Commodore P500, CBM 510 (with RAM installed in bank 15 beyond $0400 to $07ff)
 
