@@ -1232,7 +1232,10 @@ CATCHDN	= (FDIM-(SCREENH/2)-1)	; if YFLDOFS > CATCHDN no new B row to bring in
 inright	movptrs	+1		;void inright(void) {
 	bcs	+		; if (movptrs(+1) == 0) {
 	rts			;
-+	lda	#< (STL+1)	;  uint8_t a = (STL+1) & 0x000f;
++	lda	#$20		;
+	ldy	#0		;
+	jsr	wipecol		;  wipecol(0x20, SCREENW-1); // rightmost
+	lda	#< (STL+1)	;  uint8_t a = (STL+1) & 0x000f;
 	ldx	#> (STL+1)	;  uint8_t x = (STL+1) >> 8;
 	jsr	blit_dr		;  blit_dr((x<<8)|a,STL,SBR);
 	lda	#$20		;//  blitter(STL+1,STL,SBR);
@@ -1258,7 +1261,10 @@ indown	movptrs	+FDIM		;void indown(void) {
 inleft	movptrs	-1		;void inleft(void) {
 	bcs	+		; if (movptrs(-1) == 0) {
 	rts			;
-+	lda	#< (SBR-1)	;  uint8_t a = (SBR-1) & 0x000f;
++	lda	#$20		;
+	ldy	#SCREENW-1	;
+	jsr	wipecol		;  wipecol(0x20, SCREENW-1); // rightmost
+	lda	#< (SBR-1)	;  uint8_t a = (SBR-1) & 0x000f;
 	ldx	#> (SBR-1)	;  uint8_t x = (SBR-1) >> 8;
 	jsr	blit_ul		;  blit_ul((x<<8)|a,STL,SBR);
 	lda	#$20		;//  blitter(SBR-1,SBR,STL)
