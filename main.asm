@@ -64,8 +64,8 @@ FHIMASK	= ~((1<<(8-FHIBITS))-1)	; 6 => 11110000==-15, 5 => 11111100==-3
 FIELDHI	= FHIMASK & > field	; 6 => XXXX0000, 5 = XXXXXX00
 
 INITILE	= $3e			; start with five rightmost paths open
-XHAIRPV	= SCREENW*SCREENH/2	; character to the right of screen center
-XHAIRLT	= XHAIRPV-1		; character to the left of scren center
+XHAIRPV	= SCREENW*SCREENH/2+SCREENW	; character to the right of screen center
+XHAIRLT	= XHAIRPV-1		; character to the left of screen center
 XHAIRRT	= XHAIRPV+1		; the initial unplaced tile position, w/ XHAIRPV
 XHAIRUP = XHAIRPV-SCREENW	;
 XHAIRDN	= XHAIRPV+SCREENW	;
@@ -376,7 +376,7 @@ selfmod	sta	FIELDMX		;
 	lda	POINTR2		;
 	sbc	#FDIM		;
 	sta	POINTR2		;
-	lda	1+POINTR2	;
+	lda	1+POINTR2	; // FIXME: do this directly without a 2nd sbc
 	sbc	#0		;
 	sta	1+POINTR2	; POINTR2 -= FDIM; // (XFLDOFS, YFLDOFS-1)
 
@@ -401,9 +401,9 @@ selfmod	sta	FIELDMX		;
 	and	#$0f		;
 	tay			;
 	lda	symchar,y	; a = symchar[a & 0x0f];
-	sta	SCREENM+FIRSTRT	; SCREENM[XHAIRLT] = a;
+	sta	SCREENM+FIRSTRT	; SCREENM[FIRSTLT] = a;
 	lda	FIELDC		;
-	sta	SCREENC+FIRSTRT	; SCREENC[XHAIRLT] = FIELDC; // now visible
+	sta	SCREENC+FIRSTRT	; SCREENC[FIRSTLT] = FIELDC; // now visible
 
 	ldy	#DECKSIZ	;
 	dey			;
@@ -671,7 +671,7 @@ loop7	jsr	$ffe4		;    }
 	bne	++		;     } else if (a == '\r') {
 	jsr	stampit		;
 	bne	+		;      if (stampit() == 0) // copies tile into (both nybbles of) corresponding two field squares, later must return signed delta conn#      
-	jmp	loop7		;       continue; // FIXME?: stampit() isn't returning correctly
+	jmp	loop7		;       continue; // FIXME?: stampit() isn't returning correctly?
 +	jmp	loop		;      goto loop; // draw new tile and reveal
 
 
@@ -859,7 +859,7 @@ movptrs	.macro	delta		;inline uint1_t movptrs(const int8_t delta) {
 	cmp	#2		;  if (XFLDOFS < 2)
 	bcc	+		;   return C = 0;
 	dec	XFLDOFS		;  XFLDOFS -= 1;
-	sec			;
+	;sec			;
 	lda	POINTR2		;
 	sbc	#1		;
 	sta	POINTR2		;
@@ -873,7 +873,7 @@ movptrs	.macro	delta		;inline uint1_t movptrs(const int8_t delta) {
 	cmp	#2		;  if (YFLDOFS < 2)
 	bcc	+		;   return C = 0;
 	dec	YFLDOFS		;  YFLDOFS -= 1;
-	sec			;
+	;sec			;
 	lda	POINTR2		;
 	sbc	#FDIM		;
 	sta	POINTR2		;
@@ -1037,18 +1037,18 @@ setpntr	; lda	XFLDOFS		;void setpntr(uint8_t a) { // a = XFLDOFS
 	sta	POINTER		; POINTER = (void*) ((XFLDOFS - SCREENW/2)
 	lda	YFLDOFS		;
 	sec			;
-	sbc	#SCREENH/2; - 1	;
+	sbc	#(SCREENH-1)/2	;
 	ldx	#8-FIELDPW	;
 -	lsr			;
 	ror	POINTER		;
 	dex			;
-	bne	-		;       | (FDIM * (YFLDOFS - SCREENH / 2))//+1))
+	bne	-		;       | (FDIM * (YFLDOFS - (SCREENH-1) / 2))
 	ora	#>field		;       | field);
 	sta	1+POINTER	;
 	rts			;} // setpntr()
 
 .if 0
-setp_lr	; lda	XFLDOFS		;void setpntr(uint8_t a) { // a = XFLDOFS
+setp_old; lda	XFLDOFS		;void setpntr(uint8_t a) { // a = XFLDOFS
 	sec			; // set POINTER to overlap the field with the
 	sbc	#SCREENW/2	; // screen square below the upper-left corner
 	ldx	#8-FIELDPW	; // of the screen
@@ -1097,13 +1097,10 @@ regenlr	lda	#<STL		;void regenlr(uint8_t x, uint8_t y) {
 	lda	1+POINTER	;
 	and	#+FHIMASK	;
 	cmp	#FIELDHI	;
-	bne	+		;  if (POINTER & FHIMASK == FIELDHI) // overrun
+	bne	+		;  if (POINTER & FHIMASK == FIELDHI) // overrun?
 	
 	lda	symchar,x	;   // confirmed we are looking at in-field byte
 regensm	sta	$ffff,y		;   dest[y] = symchar[POINTER[y] & 0x0f];
-; cpx #$0
-; beq +
-; brk
 +	clc			;
 	lda	POINTER		;
 	adc	#FDIM		;
