@@ -62,6 +62,7 @@ FIELDMX = field+FIELDSZ-1	; last byte of FIELDSZ-aligned region 'field'
 FHIBITS	= (16 - 2 * FIELDPW)	; 6 => 4, 5 => 6 [and 8-FHIBITS 6 => 4, 5 => 2]
 FHIMASK	= ~((1<<(8-FHIBITS))-1)	; 6 => 11110000==-15, 5 => 11111100==-3
 FIELDHI	= FHIMASK & > field	; 6 => XXXX0000, 5 = XXXXXX00
+MAGIC	= (SCREENW/2) + ((SCREENH-1)/2-1)*FDIM
 
 INITILE	= $3e			; start with five rightmost paths open
 XHAIRPV	= SCREENW*SCREENH/2+SCREENW	; character to the right of screen center
@@ -1027,6 +1028,16 @@ wipecol
 .next				;  SCREENM[r*SCREENW + y] = a;
 	rts			;} // wipecol()
  
+.if 1
+setpntr	sec			;void setpntr(void) { // a = XFLDOFS
+	lda	POINTR2		;
+	sbc	# < MAGIC	;
+	sta	POINTER		; POINTER = POINTR2 // one above (FDIM/2,FDIM/2)
+	lda	1+POINTR2	;           - SCREENW/2 // left of that
+	sbc	# > MAGIC	;           - (((SCREENH-1)/2-1)*FDIM);
+	sta	1+POINTER	;
+	rts			;} // setpntr()
+.else
 setpntr	; lda	XFLDOFS		;void setpntr(uint8_t a) { // a = XFLDOFS
 	sec			; // set POINTER to overlap the field with the
 	sbc	#SCREENW/2	; // screen square below the upper-left corner
@@ -1043,27 +1054,6 @@ setpntr	; lda	XFLDOFS		;void setpntr(uint8_t a) { // a = XFLDOFS
 	ror	POINTER		;
 	dex			;
 	bne	-		;       | (FDIM * (YFLDOFS - (SCREENH-1) / 2))
-	ora	#>field		;       | field);
-	sta	1+POINTER	;
-	rts			;} // setpntr()
-
-.if 0
-setp_old; lda	XFLDOFS		;void setpntr(uint8_t a) { // a = XFLDOFS
-	sec			; // set POINTER to overlap the field with the
-	sbc	#SCREENW/2	; // screen square below the upper-left corner
-	ldx	#8-FIELDPW	; // of the screen
--	asl			;
-	dex			;
-	bne	-		;
-	sta	POINTER		; POINTER = (void*) ((XFLDOFS - SCREENW/2)
-	lda	YFLDOFS		;
-	sec			;
-	sbc	#SCREENH/2 - 1	;
-	ldx	#8-FIELDPW	;
--	lsr			;
-	ror	POINTER		;
-	dex			;
-	bne	-		;       | (FDIM * (YFLDOFS - SCREENH / 2 + 1))
 	ora	#>field		;       | field);
 	sta	1+POINTER	;
 	rts			;} // setpntr()
