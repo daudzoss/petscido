@@ -5,7 +5,7 @@ VIC20NO	= 1			; many features won't fit in unexpanded vic20
 .else
 .error	"256 > 2^FIELDPW > min(SCREENH,SCREENW) violated"	
 .endif
-	
+
 DIRTCLR	= 0			; black
 NOTDIRT	= 1			; white
 
@@ -108,7 +108,7 @@ TILE3AT	.byte	toplin3-topline	;                              topline+20};
 .if VIC20NO
 UNRSLVD	.byte	$05		; static uint8_t UNRSLVD = 5; // INITILE's 5 1's
 .endif
-	
+
 FIELDC	.byte	DIRTCLR		; static uint8_t FIELDC = DIRTCLR; // black
 XHAIRC	.byte	$62		; static uint8_t XHAIRC = 0x62; // bright orange
 
@@ -249,22 +249,13 @@ copynyb	.macro
 	jsr	copynye
 	.endm
 
-.if 0
-	lda FIELDC		;void main(void) {
-	ldy #$e2
--	sta SCREENC+SCREENW-1,y
-	sta SCREENC+SCREENW-1+$e2,y ; FIXME: harmless? workaround (for vic20 screen not having color already set)
-	dey
-	bne -
-.endif
-
 SEEDVAL	:?= 0
 SEEDLOC	:?= 0
 
 main
 .if !BASIC
-	lda	#$0f
-	sta	$01
+	lda	#$0f		;// P500 has to start in bank 15
+	sta	$01		;static volatile int execute_bank = 15;
 .endif
 	lda	#<SBR1U		;static int called=0;
 	sta	POINTER		;
@@ -360,12 +351,12 @@ selfmod	sta	FIELDMX		;
 	ldy	selfmod+2	;
 	cpy	# >field	; for (uint8_t* sm = FIELDMX; sm > field; sm--)
 	bcs	selfmod		;  *sm = 0; // whole field starts blanked
-	
+
 	ldy	#SCREENW	;
 -	sta	FIELDMX,y	;
 	dey			; for (uint8_t yval = SCREENW; yval; yval--)
 	bne	-		;  FIELDMX[y] = 0; // and SCREENW bytes beyond
-	
+
 	lda	#FDIM/2
 	sta	XFLDOFS		; XFLDOFS = (1<<(FIELDPW-1)); // middle of field
 	sta	YFLDOFS		; YFLDOFS = (1<<(FIELDPW-1)); // middle of field
@@ -422,7 +413,7 @@ selfmod	sta	FIELDMX		;
 	sta	CURTNUM		; CURTNUM = 1; // or 2 or 3
 
 loop	ldy	DECKREM		; for (;;) { // place a new current tile
-	
+
 	bne	+		;  if (DECKREM == 0) { // take last 3 until gone
 	tya			;
 	ldy	CURTNUM		;
@@ -563,9 +554,9 @@ loop7
 	sta	BKGRNDC		;
 +
 .endif
-	jsr	$ffe4		;    }
+-	jsr	$ffe4		;    }
 	cmp	#$00		;
-	beq	loop7		;    while ((a = getchar()) { // keyboard loop
+	beq	-		;    while ((a = getchar()) { // keyboard loop
 	cmp	#'1'		;
 	beq	+		;
 	cmp	#'2'		;
@@ -586,6 +577,32 @@ loop7
 	sta	CURTILE		;      CURTILE[0] |= CURTILE[CURTNUM]; // w/rotn
 	clc			;
 	jmp	cyxhair		;      goto cyxhair;
+
++	cmp	#$14
+	bne	++		;
+	ldy	DECKREM		;
+	beq	++		;     } else if ((a == 0x14) && DECKREM) { //DEL
+	ldx	#$03		;      for (uint8_t x = 3; x; x--) {
+-	lda	CURTILE,x	;
+	beq	+		;       if (CURTILE[x]) {
+	pha			;
+-	lda	deck-1,y	;        for (y = DECKREM; y; y--)
+	sta	deck,y		;         deck[y] = deck[y-1];
+	dey			;
+	bne	-		;
+	pla			;
+	sta	deck		;        deck[0] = CURTILE[x];
+	ldy	DECKREM		;
+	lda	deck,y		;
+	sta	CURTILE,x	;        CURTILE[x] = deck[DECKREM];
+	lda	CURTILE		;
+	and	#$c0		;        CURTILE[0] &= 0xc0; // grab rot'n bits
+	ora	CURTILE,x	;
+	sta	CURTILE		;        CURTILE[0] |= CURTILE[x];
++	dex			;       }
+	bne	--		;      }
+	jsr	reveal		;      reveal();
+	jmp	cyxhair		;
 
 +	and	#$df		;      }
 	cmp	#$1d		;     } else if ((a &= 0xdf) == 0x1d) {
@@ -649,7 +666,7 @@ loop7
 	jsr	liftile		;      liftile();
 	jsr	inup		;      inup();
 	jmp	loop1		;
-	
+
 +	cmp	#'f'		;
 	bne	+		;     } else if (a == 0x46) {
 	lda	XHAIRC		;
@@ -666,7 +683,7 @@ loop7
 	jmp	cyxhair		;
 
 +	cmp	#$80		;     } else if (a == $a0 & 0xdf) { // ccw rot'n
-	
+
 +
 .endif
 	cmp	#'b'		;     } else if (a == 0x41) { // bgnd/border clr
@@ -684,7 +701,7 @@ loop7
 .if BKGRNDC
 	lda	#DIRTCLR	;       if (BKGRNDC) *BKGRNDC = DIRTCLR;//flashed
 	sta	BKGRNDC		;       continue; // FIXME?: stampit() isn't returning correctly?
-	lda	#0		;
+	lda	#$40		;
 	tay			;
 	tax			;
 -	dex			;
@@ -695,33 +712,6 @@ loop7
 	jmp	loop7		;      }
 +	jmp	loop		;      goto loop; // draw new tile and reveal
 
-
-
-+	cmp	#$14
-	bne	++		;
-	ldy	DECKREM		;
-	beq	++		;     } else if ((a == 0x14) && DECKREM) {
-	ldx	#$03		;      for (uint8_t x = 3; x; x--) {
--	lda	CURTILE,x	;
-	beq	+		;       if (CURTILE[x]) {
-	pha			;
--	lda	deck-1,y	;        for (y = DECKREM; y; y--)
-	sta	deck,y		;         deck[y] = deck[y-1];
-	dey			;
-	bne	-		;
-	pla			;
-	sta	deck		;        deck[0] = CURTILE[x];
-	ldy	DECKREM		;
-	lda	deck,y		;
-	sta	CURTILE,x	;        CURTILE[x] = deck[DECKREM];
-	lda	CURTILE		;
-	and	#$c0		;        CURTILE[0] &= 0xc0; // grab rot'n bits
-	ora	CURTILE,x	;
-	sta	CURTILE		;        CURTILE[0] |= CURTILE[x];
-+	dex			;       }
-	bne	--		;      }
-	jsr	reveal		;      reveal();
-	jmp	cyxhair		;
 +
 .if VIC20NO
 	cmp	#$13		;     } else if (a == 0x13 /*CLR/HOME*/ {
@@ -745,7 +735,7 @@ loop7
 +	jsr	inleft		;         inleft(); // so bump left
 	lda	XFLDOFS		;
 	bne	-		;
-	
+
 +	lda	YFLDOFS		;
 -	cmp	#FDIM/2		;
 	beq	++		;       while (YFLDOFS != FDIM/2)
@@ -770,19 +760,24 @@ loop7
 	pha			;
 	lda	SCREENM		;
 	pha			;
+	lda	#DIRTCLR	;
+	sta	BKGRNDC		;
 	lda	#$11		;      printf("%cQ?", 0x13 /* HOME */);
 	sta	SCREENM		;      if (getchar() & 0xdf != 'y')      
 	lda	#'?'		;
-	sta	SCREENM+1	;       continue;
--	jsr	$ffe4		;       else
+	sta	SCREENM+1	;       printf("%c%2d", 0x13, DECKREM);
+-	jsr	$ffe4		;      else
 	cmp	#$00		;
 	beq	-		;       return;
 	and	#$df		;     }
 	tay			;
+	lda	#NOTDIRT	;
+	sta	BKGRNDC		;
 	pla			;
 	sta	SCREENM		;
 	pla			;
 	sta	SCREENM+1	;    } // next keyboard input
+
 
 	cpy	#'y' & $df	;   } // next rotation
 	beq	+		;  } // next position
@@ -913,7 +908,7 @@ blshare .macro			;void blshare(uint8_t* ax_src_lh) {
 	stx	(+)+12		; // initialized self-modifying src to (x<<8)|a
 +
 	.endm			;} // blshare()[blconst REPLACEMENT to save RAM]
-	
+
 blconst	.macro	src
 	lda	# <\src		;void blconst(uint8_t* src) {
 	sta	(+)+11		;
@@ -1103,12 +1098,12 @@ regenlr	lda	#<STL		;void regenlr(uint8_t x, uint8_t y) {
 	lda	(POINTER),y	;
 	and	#$0f		;
 	tax			;
-	
+
 	lda	1+POINTER	;
 	and	#+FHIMASK	;
 	cmp	#FIELDHI	;
 	bne	+		;  if (POINTER & FHIMASK == FIELDHI) // overrun?
-	
+
 	lda	symchar,x	;   // confirmed we are looking at in-field byte
 regensm	sta	$ffff,y		;   dest[y] = symchar[POINTER[y] & 0x0f];
 +	clc			;
@@ -1160,12 +1155,12 @@ apostro	.text	$27,$13		;
 	lda	#>(SBR1U+1)	; regentb(dest);
 	sta	regn2sm+2	;}
 regentb	ldy	#SCREENW-1	;void regentb(uint8_t* dest) {
-	
+
 	lda	1+POINTER	;
 	and	#+FHIMASK	;
 	cmp	#FIELDHI	;  if (POINTER & FHIMASK != FIELDHI) // overrun!
 	bne	+		;   break; // started stomping on non-field bits
-	
+
 -	lda	(POINTER),y	; for (int8_t y = SCREENW - 1; y >= 0; y--)
 	and	#$0f		;
 	tax			;
@@ -1224,7 +1219,7 @@ repaint	.macro	xlim=0, ylim=0	;inline void repaint(uint8_t xlim,uint8_t ylim){
 blit_ul	blshare			;void blit_ul(uint8_t* ax_lh) { blshare(ax_lh);
 	blitter	SBR-1,SBR,STL	; blitter(SBR-1 /* SBR1U is equiv. */,SBR,STL);
 	rts			;}
-	
+
 blit_dr	blshare			;void blit_dr(uint8_t* ax_lh) { blshare(ax_lh);
 	blitter	STL+1,STL,SBR	; blitter(STL+1 /* STL1D is equiv. */,STL,SBR);
 	rts			;}
