@@ -193,7 +193,7 @@ innsyma	.text	$1		; 0:
 	.text	$5		; 1: enters from left, closed off
 	.text	$9		; 2: enters from top left, closed off
 	.text	$d		; 3: enters from left, deflected up, closed off
-	.text	$3		; 4: enters from bottom left, close off
+	.text	$3		; 4: enters from bottom left, closed off
 	.text	$7		; 5: enters from left,deflected down, closed off
 	.text	$b		; 6: enters from top left, exits bottom left
 	.text	$f		; 7: enters all left sides, closed off
@@ -695,12 +695,12 @@ loop7
 	jmp	loop2		;      break; // rotate cw through all 4 options
 
 +	cmp	#$0d		;
-	bne	++		;     } else if (a == '\r') {
+	bne	+++		;     } else if (a == '\r') {
 	jsr	stampit		;
 	bne	+		;      if (stampit() == 0) { // copies tile into (both nybbles of) corresponding two field squares, FIXME: later must return signed delta conn#      
 .if BKGRNDC
-	lda	#DIRTCLR	;       if (BKGRNDC) *BKGRNDC = DIRTCLR;//flashed
-	sta	BKGRNDC		;       continue; // FIXME?: stampit() isn't returning correctly?
+	lda	#DIRTCLR	;       if (BKGRNDC)
+	sta	BKGRNDC		;        *BKGRNDC = DIRTCLR;//flashed
 	lda	#$40		;
 	tay			;
 	tax			;
@@ -710,7 +710,15 @@ loop7
 	bne	-		;
 .endif
 	jmp	loop7		;      }
-+	jmp	loop		;      goto loop; // draw new tile and reveal
++
+.if VIC20NO
+	lda	UNRSLVD		;
+	beq	+		;      if (UNRESLVD)
+	jmp	loop		;       goto loop; // draw new tile and reveal
++	jmp	qprompt		;      else goto qprompt; // all done, game won!
+.else
+	jmp	loop		;
+.endif
 
 +
 .if VIC20NO
@@ -753,9 +761,9 @@ loop7
 +
 .endif	
 	cmp	#'q'		;
-	beq	+		;
+	beq	qprompt		;
 	jmp	loop7		;     } else if (a == 0x51) {
-+
+qprompt
 	lda	SCREENM+1	;
 	pha			;
 	lda	SCREENM		;
@@ -1317,24 +1325,59 @@ tofield	.macro			;inline uint8_t tofield(uint1_t out,
 	lda	(POINTR2),y	; return x /*new*/, a = POINTR2[y] /*old,=0? */;
 	.endm			;}
 
+.if VIC20NO
+chkseam	lda	#0		;uint1_t chkseam(register uint8_t& a, register
+	cmp	#$ff		;  uint8_t y) { a=0; return z=0; // trivial pass
+	rts			;} // chkseam()
+.endif
+
 stampit	lda	CURTILE		;uint8_t stampit(uint8_t a) {
-	beq	nostamp		; if ((CURTILE[0] = a) != 0) // tile not blank
+	beq	nostamp		; if ((CURTILE[0] = a) != 0) { // tile not blank
 	tofield	0		;
 	bne	nostamp		;  if (tofield(0 /*inner*/, a, &x, &y) == 0) {
 	txa			;
-	pha			;   uint8_t stack = x; // will stamp inner last
+	pha			;   uint8_t stack = x; // inner pattern to stamp
 	tofield	1		;
-	bne	+		;   if (tofield(1 /*outer*/, a, &x, &y) == 0) {
+	bne	nostam1		;   if (tofield(1 /*outer*/, a, &x, &y) == 0) {
 	txa			;    // no tile(s) in this one's location yet
-	sta	(POINTR2),y	;    POINTR2[y] = x;
+.if VIC20NO
+	pha			;    uint8_t stack1 = x; // after outer pattern
+	jsr	chkseam		;    uint8_t a;
+	beq	nostam2		;    if (chkseam(&a, y)) { // delta conns in a
+
+	tya			;     // outer square of tile passed check
+	pha			;     uint8_t stack2 = y; // save outer location
+	ldy	#FDIM		;     y = FDIM;
+	jsr	chkseam		;     if (chkseam(&a, y)) { // delta conns in a
+	beq	nostam3		;      // inner square of tile passed check too
+
+	clc			;
+	adc	UNRSLVD		;
+	sta	UNRSLVD		;      UNRSLVD += a;
 	pla			;
+	tay			;      y = stack2; // outer location back in y
+	pla			;
+	tax			;      x = stack1; // outer pattern back in a
+.endif
+	sta	(POINTR2),y	;      POINTR2[y] = x;
 	ldy	#FDIM		;
-	sta	(POINTR2),y	;    POINTR2[FDIM] = stack;
-	lda	CURTILE		;    return CURTILE[0];
-	rts			;   }
-+	pla			;  }
+.if VIC20NO
+	jsr	chkseam		;      UNRSLVD(&a, y); // better still pass
+	bne	+		;      // a failure here likely means that the
+	brk			;      // tile used the wrong innsyma/outsyma?
++	clc			;
+	adc	UNRSLVD		;
+	sta	UNRSLVD		;      UNRSLVD += a;
+.endif
+	pla			;      POINTR2[FDIM] = stack;
+	sta	(POINTR2),y	;      return CURTILE[0];
+	lda	CURTILE		;     }
+	rts			;    }
+nostam3	pla			;   }
+nostam2	pla			;  } 
+nostam1	pla			; }
 nostamp	lda	#0		; return 0;
-	rts			;}
+	rts			;} // stampit()
 
 numleft	dec	SCREENM+1	;void numleft(void) {
 	lda	SCREENM+1	; static char remain = {'6', '7'};
