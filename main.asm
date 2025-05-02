@@ -1379,10 +1379,12 @@ nostam1	pla			; }
 nostamp	lda	#0		; return 0;
 	rts			;} // stampit()
 
-numleft	dec	SCREENM+1	;void numleft(void) {
+numleft
+.if 0
+	dec	SCREENM+1	;void numleft(void) {
 	lda	SCREENM+1	; static char remain = {'6', '7'};
 	cmp	#'0'-1		; remain[1] -= 1; // decrement # remaining tiles
-	bne	++		; if (remain[1] < '0') {
+	bne	+		; if (remain[1] < '0') {
 	lda	#'9'		;
 	sta	SCREENM+1	;  remain[1] = '9'; // restore 1's digit to 9
 	dec	SCREENM		;  remain[0] -= 1; // decrement 10's digit
@@ -1391,11 +1393,21 @@ numleft	dec	SCREENM+1	;void numleft(void) {
 	bne	+		;  if (remain[0] == '0')
 	lda	#' '		;
 	sta	SCREENM		;   remain[0] = ' '; // at 9, wipe leading zero
-	rts			;
-+	cmp	#' '-1		;  else if (remain[0] < ' ')
-	bne	+		;   _brk();
-;	brk			; }
-+	rts			;} // numleft()
++
+.else
+	lda	#$0f		;void numlef2(void) {
+	bit	SCREENM+1	;
+	bne	++		; if (SCREENM[1] & 0x0f == 0) { // ones digit==0
+	dec	SCREENM		;  SCREENM[0] -= 1; // decr tens digit
+	bit	SCREENM		;
+	bne	+		;  if (SCREENM[0] & 0x0f == 0) // but not below 1
+	lda	#' '		;
+	sta	SCREENM		;   SCREENM[0] = ' '; // just make 0 whitespace
++	lda	#1+'9'		;  SCREENM[1] = '9'+1; // incr ones digit past 9
+	sta	SCREENM+1	; }
++	dec	SCREENM+1	; SCREENM[1]-= 1; // decr ones digit
+.endif
+	rts			;} // numleft()
 
 rot90c0	rot90c
 	rts
