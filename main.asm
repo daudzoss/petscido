@@ -47,8 +47,23 @@ toplin3	.text	"  =3",$99
 .else
 	.text	$90		; BLK
 .endif	
+rights
 	.text	"all rights helvetiq sa"
-	.text	$22,$3a,$9e	; " : SYS main
+owner	
+.if VIC20NO
+ .if 1	
+	.fill   SCREENW+rights-owner," "
+	.text	$22		; "
+ .else	
+	.text	$22,$53,$50,$43	; " S P C
+	.text	$28		; (
+	.text	format("%2d",SCREENW+rights-owner)
+	.text	$29		; )
+ .endif
+.else
+	.text	$22		; "
+.endif
+	.text	$3a,$9e		; : SYS main
 	.null	format("%4d",main)
 +	.word 0
 .if !BASIC
