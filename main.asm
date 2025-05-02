@@ -695,11 +695,11 @@ loop7
 	jmp	loop2		;      break; // rotate cw through all 4 options
 
 +	cmp	#$0d		;
-	bne	+++		;     } else if (a == '\r') {
+	bne	clrhome		;     } else if (a == '\r') {
 	jsr	stampit		;
-	bne	+		;      if (stampit() == 0) { // copies tile into (both nybbles of) corresponding two field squares, FIXME: later must return signed delta conn#      
+	bne	+		;      if (stampit() == 0) { // copy tile to field
 .if BKGRNDC
-	lda	#DIRTCLR	;       if (BKGRNDC)
+	lda	#DIRTCLR	;       if (BKGRNDC) {
 	sta	BKGRNDC		;        *BKGRNDC = DIRTCLR;//flashed
 	lda	#$40		;
 	tay			;
@@ -707,20 +707,20 @@ loop7
 -	dex			;
 	bne	-		;
 	dey			;
-	bne	-		;
+	bne	-		;        continue;
 .endif
-	jmp	loop7		;      }
+	jmp	loop7		;       }
 +
 .if VIC20NO
-	lda	UNRSLVD		;
-	beq	+		;      if (UNRESLVD)
-	jmp	loop		;       goto loop; // draw new tile and reveal
-+	jmp	qprompt		;      else goto qprompt; // all done, game won!
+	lda	UNRSLVD		;       if (UNRESLVD)
+	beq	+		;        goto loop; // draw new tile and reveal
+	jmp	loop		;       else
++	jmp	qprompt		;        goto qprompt; // all done, game won!
 .else
-	jmp	loop		;
+	jmp	loop		;      }
 .endif
 
-+
+clrhome
 .if VIC20NO
 	cmp	#$13		;     } else if (a == 0x13 /*CLR/HOME*/ {
 	bne	++++++		;
