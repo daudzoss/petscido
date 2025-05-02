@@ -33,7 +33,7 @@ COPIED2	= $0400
 DECKSIZ	= pstdeck-deck
 	.word	(+), 2055
 	.text	$99,$22,$1f,$09	; PRINT " CHR(31) CHR$(9) // BLU,enable
-	.text	$8e,$08,$93	; CHR$(142) CHR$(8) CHR$(19) // UPPER,disabl,clr
+	.text	$8e,$08,$13;$93	; CHR$(142) CHR$(8) CHR$(19) // UPPER,disabl,clr
 topline	.text	format("%2d", DECKSIZ)
 	.text	" left "
 toplin1	.text	"  =1 "
@@ -291,8 +291,8 @@ main2	lda	FIELDC		;
 	bcs	-		;    ; // x now a valid index into the deck
 	tax			;
 
-.if VIC20NO
-EXTRSHF	:?= 2
+.if 1;VIC20NO
+EXTRSHF	:?= $20*(1<<(7-FIELDPW))
 	lda	#EXTRSHF	;   for (uint8_t a = EXTRSHF; a; a--) {
 main4	pha			;
 .endif
@@ -308,7 +308,7 @@ main4	pha			;
 	sta	deck,x		;    deck[x] = deck[y];
 	pla			;
 	sta	deck,y		;    deck[y] = temp;
-.if VIC20NO
+.if 1;VIC20NO
 	pla			;
 	sec			;
 	sbc	#1		;
