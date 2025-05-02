@@ -96,6 +96,7 @@ DBACKUP	= vararea+$9 ;.byte ?	; static uint8_t DBACKUP;
 XFLDOFS	= vararea+$a ;.byte ?	; static uint8_t XFLDOFS; // horizontal
 YFLDOFS	= vararea+$b ;.byte ?	; static uint8_t YFLDOFS; // vertical
 DECKREM	= vararea+$c ;.byte ?	; static uint8_t DECKREM;
+TEMPVAR	= vararea+$d ;.byte ?	; static uint8_t TEMPVAR[];
 
 ROTNOFS .byte	FDIM+1		; static const ROTNOFS[] = {FDIM+1, //R is 1D 1R
 	.byte 	FDIM*2		;                           FDIM*2, //D is 2D
@@ -1326,8 +1327,78 @@ tofield	.macro			;inline uint8_t tofield(uint1_t out,
 	.endm			;}
 
 .if VIC20NO
+pntr2rt
+pntr2lt
+pntr2up
+pntr2dn
+	
+.if 1
 chkseam	lda	#0		;uint1_t chkseam(register uint8_t& a, register
 	cmp	#$ff		;  uint8_t y) { a=0; return z=0; // trivial pass
+.else
+pntr2up
+pntr2lt
+pntr2rt
+pntr2dn
+
+	
+RESULTU	= TEMPVAR
+RESULTL	= TEMPVAR+1
+RESULTR	= TEMPVAR+2
+RESULTD	= TEMPVAR+3
+chkseam	sec			;uint1_t chkseam(register uint8_t& a,
+	lda	POINTR2		;                register uint8_t y) {
+	sbc	#FDIM		; int8_t RESULTU, RESULTL, RESULTR, RESULTD; 
+	sta	POINTER		;
+	lda	1+POINTR2	;
+	sbc	#0		;
+	sta	POINTER		;
+	jsr	pntr2up		; POINTER = POINTR2-FDIM; // candidate top seam
+	sta	RESULTU		; RESULTU = pntr2up();
+	bmi	illseam		; if (RESULTU < 0) return 0; // Z set
+
+	sec			;
+	lda	POINTR2		; 
+	sbc	#1		;
+	sta	POINTER		;
+;	lda	1+POINTR2	;
+;	sbc	#0		;
+;	sta	POINTER		;
+	jsr	pntr2lt		; POINTER = POINTR2-1; // candidate left seam
+	sta	RESULTL		; RESULTL = pntr2lt();
+	bmi	illseam		; if (RESULTL < 0) return 0; // Z set
+	
+	inc	POINTR2		;
+	inc	POINTR2		;
+;	clc			;
+;	lda	POINTR2		;
+;	adc	#1		;
+;	sta	POINTER		;
+;	lda	1+POINTR2	;
+;	adc	#0		;
+;	sta	POINTER		;
+	jsr	pntr2rt		; POINTER = POINTR2+1; // candidate right seam
+	bmi	illseam		; if (RESULTR < 0) return 0; // Z set
+	sta	RESULTR		; RESULTR = pntr2rt();
+	
+	clc			;
+	lda	POINTR2		;
+	adc	#FDIM		;
+	sta	POINTER		;
+	lda	1+POINTR2	;
+	adc	#0		;
+	sta	POINTER		;
+	jsr	pntr2dn		; POINTER = POINTR2+FDIM; // candidate bot seam
+	sta	RESULTD		; RESULTD = pntr2dn();
+	bmi	illseam		; if (RESULTD < 0) return 0; // Z set
+
+	
+	
+	rts			;
+illseam
+	lda	#0		; // A=0, Z=1 if adjacent sides of seam mismatch
++
+.endif
 	rts			;} // chkseam()
 .endif
 
@@ -1353,7 +1424,7 @@ stampit	lda	CURTILE		;uint8_t stampit(uint8_t a) {
 
 	clc			;
 	adc	UNRSLVD		;
-	sta	UNRSLVD		;      UNRSLVD += a;
+	sta	UNRSLVD		;      UNRSLVD += a; // a<0 closing in,>0 losing
 	pla			;
 	tay			;      y = stack2; // outer location back in y
 	pla			;
@@ -1367,7 +1438,7 @@ stampit	lda	CURTILE		;uint8_t stampit(uint8_t a) {
 	brk			;      // tile used the wrong innsyma/outsyma?
 +	clc			;
 	adc	UNRSLVD		;
-	sta	UNRSLVD		;      UNRSLVD += a;
+	sta	UNRSLVD		;      UNRSLVD += a; // a<0 closing in,>0 losing
 .endif
 	pla			;      POINTR2[FDIM] = stack;
 	sta	(POINTR2),y	;      return CURTILE[0];
