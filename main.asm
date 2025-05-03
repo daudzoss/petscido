@@ -592,7 +592,7 @@ loop7
 	beq	+		;
 	cmp	#$86		;
 	beq	+		;
-	cmp	#$87		;             /*F1*/       /*F3*/       /*F7*/
+	cmp	#$87		;             /*F1*/       /*F3*/       /*F5*/
 	bne	+++		;         a == 0x85 || a == 0x86 || a == 0x87) {
 +	and	#$03		;
 	tay			;
@@ -722,9 +722,11 @@ loop7
 +
 .endif
 
-+	cmp	#0		;     } else if (a == ' ' & 0xdf) {
-	bne	+		;
-	jmp	loop2		;      break; // rotate cw through all 4 options
++	cmp	#0		;     } else if (a == ' ' & 0xdf ||
+	beq	+		;                    /*F7*/
+	cmp	#$88		;                a == 0x88) {
+	bne	++		;
++	jmp	loop2		;      break; // rotate cw through all 4 options
 
 +	cmp	#$0d		;
 	bne	clrhome		;     } else if (a == '\r') {
