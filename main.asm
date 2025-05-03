@@ -442,13 +442,13 @@ loop	ldy	DECKREM		; for (;;) { // place a new current tile
 	bne	-		;   }
 	rts			;   if (!CURTILE[x]) return; // empty, game lost
 +	dey			;  } else {
+	jsr	numleft		;   numleft(); // decr # remaining tiles
 	sty	DECKREM		;
 	lda	deck,y		;
-	ldy	CURTNUM		;
-	sta	CURTILE		;   CURTILE[0] =
-	sta	CURTILE,y	;            CURTILE[CURTNUM] = deck[--DECKREM];
-	jsr	numleft		;   numleft(); // decr # remaining tiles
-+	jsr	reveal		;   reveal();
+	ldy	CURTNUM		;   CURTILE[CURTNUM] = deck[--DECKREM];
+	sta	CURTILE,y	;  }
++	sta	CURTILE		;  CURTILE[0] = CURTILE[CURTNUM];
+	jsr	reveal		;  reveal();
 
 	sec			;  for (uint1_t c = 1; ; c = 0) { // new position
 loop1	lda	SCREENM+XHAIRPV	;
@@ -1347,10 +1347,10 @@ pntr2lt
 pntr2up
 pntr2dn
 	
-.if 1
+ .if 1
 chkseam	lda	#0		;uint1_t chkseam(register uint8_t& a, register
 	cmp	#$ff		;  uint8_t y) { a=0; return z=0; // trivial pass
-.else
+ .else
 pntr2up
 pntr2lt
 pntr2rt
@@ -1367,10 +1367,10 @@ chkseam	sec			;uint1_t chkseam(register uint8_t& a,
 	sta	POINTER		;
 	lda	1+POINTR2	;
 	sbc	#0		;
-	sta	POINTER		;
+	sta	1+POINTER	;
 	jsr	pntr2up		; POINTER = POINTR2-FDIM; // candidate top seam
 	sta	RESULTU		; RESULTU = pntr2up();
-	bmi	illseam		; if (RESULTU < 0) return 0; // Z set
+	bmi	illseam		; if (RESULTU < 0) return 0x80; // z set
 
 	sec			;
 	lda	POINTR2		; 
@@ -1378,10 +1378,10 @@ chkseam	sec			;uint1_t chkseam(register uint8_t& a,
 	sta	POINTER		;
 ;	lda	1+POINTR2	;
 ;	sbc	#0		;
-;	sta	POINTER		;
+;	sta	1+POINTER	;
 	jsr	pntr2lt		; POINTER = POINTR2-1; // candidate left seam
 	sta	RESULTL		; RESULTL = pntr2lt();
-	bmi	illseam		; if (RESULTL < 0) return 0; // Z set
+	bmi	illseam		; if (RESULTL < 0) return 0x80; // z set
 	
 	inc	POINTR2		;
 	inc	POINTR2		;
@@ -1391,9 +1391,9 @@ chkseam	sec			;uint1_t chkseam(register uint8_t& a,
 ;	sta	POINTER		;
 ;	lda	1+POINTR2	;
 ;	adc	#0		;
-;	sta	POINTER		;
+;	sta	1+POINTER	;
 	jsr	pntr2rt		; POINTER = POINTR2+1; // candidate right seam
-	bmi	illseam		; if (RESULTR < 0) return 0; // Z set
+	bmi	illseam		; if (RESULTR < 0) return 0x80; // z set
 	sta	RESULTR		; RESULTR = pntr2rt();
 	
 	clc			;
@@ -1402,18 +1402,24 @@ chkseam	sec			;uint1_t chkseam(register uint8_t& a,
 	sta	POINTER		;
 	lda	1+POINTR2	;
 	adc	#0		;
-	sta	POINTER		;
+	sta	1+POINTER	;
 	jsr	pntr2dn		; POINTER = POINTR2+FDIM; // candidate bot seam
+	bmi	illseam		; if (RESULTD < 0) return 0x80; // z set
 	sta	RESULTD		; RESULTD = pntr2dn();
-	bmi	illseam		; if (RESULTD < 0) return 0; // Z set
-
-	
-	
-	rts			;
+	ora	RESULTR		;
+	ora	RESULTL		;
+	ora	RESULTU		;
+	php			; uint1_t z = RESULTU|RESULTL|RESULTR|RESULTD;
+	clc			;
+	lda	RESULTD		;
+	adc	RESULTL		;
+	adc	RESULTU		;
+	plp			; // z will be set if all (not the sum) are zero
+	rts			; return RESULTU + RESULTL + RESULTR + RESULTU;
 illseam
-	lda	#0		; // A=0, Z=1 if adjacent sides of seam mismatch
+	lda	#$80		; // A=0, Z=1 if adjacent sides of seam mismatch
 +
-.endif
+ .endif
 	rts			;} // chkseam()
 .endif
 
@@ -1481,7 +1487,7 @@ numleft
 	sta	SCREENM		;   remain[0] = ' '; // at 9, wipe leading zero
 +
 .else
-	lda	#$0f		;void numlef2(void) {
+	lda	#$0f		;void numleft(void) {
 	bit	SCREENM+1	;
 	bne	++		; if (SCREENM[1] & 0x0f == 0) { // ones digit==0
 	dec	SCREENM		;  SCREENM[0] -= 1; // decr tens digit
