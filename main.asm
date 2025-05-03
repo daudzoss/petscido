@@ -1429,7 +1429,7 @@ illseam
 	rts			;} // chkseam()
 .endif
 
-ZFLGMSK	= 1
+ZFLGMSK	= 1<<1
 stampit	lda	CURTILE		;uint8_t stampit(uint8_t a) {
 	beq	nostamp		; if ((CURTILE[0] = a) != 0) { // tile not blank
 	tofield	0		;
