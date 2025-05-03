@@ -1383,9 +1383,9 @@ algnedg	.macro	new,old		;inline int8_t algnedg(uint4_t new,uint4_t old){
 	.endm			;} // algnedg()
 	
  .if 1
-chkseam	lda	#0		;uint1_t chkseam(register uint8_t& a, register
-	clc			;  uint8_t y) { a=0; return c=0,z=0; // trivial
-	cmp	#$ff		;} // chkseam()
+chkseam	lda	#0		;uint1_t chkseam(register uint8_t& a,
+	clc			;                register uint8_t y) {
+	cmp	#$ff		; a=0; return c=0,z=0; // trivial
  .else
 pntr2up	algnedg	1<<3,1<<1	;int8_t pntr2up(void) { return algnedg(8,2);
 	rts			;}
