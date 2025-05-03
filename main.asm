@@ -98,20 +98,25 @@ SBR	= SCREENM+SCREENW*(SCREENH-0)-1 ; screen bottom-right corner
 POINTER = ZP			; static void* POINTER;
 POINTR2 = ZP+2			; static void* POINTR2;
 
-CURTILE	= vararea+$0 ;.byte ?	; static uint8_t CURTILE[4]; // shown and 2 more
-CURTIL1	= vararea+$1 ;.byte ?	;
-CURTIL2	= vararea+$2 ;.byte ?	;
-CURTIL3	= vararea+$3 ;.byte ?	;
-CURTNUM	= vararea+$4 ;.byte ?	; static uint2_t CURTNUM;
-PBACKUP	= vararea+$5 ;.byte ?	; static uint8_t PBACKUP;
-LBACKUP	= vararea+$6 ;.byte ?	; static uint8_t LBACKUP;
-RBACKUP = vararea+$7 ;.byte ?	; static uint8_t RBACKUP;
-UBACKUP	= vararea+$8 ;.byte ?	; static uint8_t UBACKUP;
-DBACKUP	= vararea+$9 ;.byte ?	; static uint8_t DBACKUP;
-XFLDOFS	= vararea+$a ;.byte ?	; static uint8_t XFLDOFS; // horizontal
-YFLDOFS	= vararea+$b ;.byte ?	; static uint8_t YFLDOFS; // vertical
-DECKREM	= vararea+$c ;.byte ?	; static uint8_t DECKREM;
-TEMPVAR	= vararea+$d ;.byte ?	; static uint8_t TEMPVAR[];
+CURTILE	= vararea+$00 		; static uint8_t CURTILE[4]; // shown and 2 more
+CURTIL1	= vararea+$01 		;
+CURTIL2	= vararea+$02 		;
+CURTIL3	= vararea+$03 		;
+CURTNUM	= vararea+$04 		; static uint2_t CURTNUM;
+PBACKUP	= vararea+$05 		; static uint8_t PBACKUP;
+LBACKUP	= vararea+$06 		; static uint8_t LBACKUP;
+RBACKUP = vararea+$07 		; static uint8_t RBACKUP;
+UBACKUP	= vararea+$08 		; static uint8_t UBACKUP;
+DBACKUP	= vararea+$09 		; static uint8_t DBACKUP;
+XFLDOFS	= vararea+$0a 		; static uint8_t XFLDOFS; // horizontal
+YFLDOFS	= vararea+$0b 		; static uint8_t YFLDOFS; // vertical
+DECKREM	= vararea+$0c 		; static uint8_t DECKREM;
+OVERBRD	= vararea+$0d		; static int8_t OVERBRD;
+TEMPVAR	= vararea+$0e		; static int8_t TEMPVAR;
+RESULTU	= vararea+$0f		; static int8_t RESULTU;
+RESULTL	= vararea+$10		; static int8_t RESULTL;
+RESULTR	= vararea+$11		; static int8_t RESULTR;
+RESULTD	= vararea+$12		; static int8_t RESULTD;
 
 ROTNOFS .byte	FDIM+1		; static const ROTNOFS[] = {FDIM+1, //R is 1D 1R
 	.byte 	FDIM*2		;                           FDIM*2, //D is 2D
@@ -1346,7 +1351,7 @@ pntr2rt
 pntr2lt
 pntr2up
 pntr2dn
-	
+
  .if 1
 chkseam	lda	#0		;uint1_t chkseam(register uint8_t& a, register
 	cmp	#$ff		;  uint8_t y) { a=0; return z=0; // trivial pass
@@ -1356,21 +1361,17 @@ pntr2lt
 pntr2rt
 pntr2dn
 
-	
-RESULTU	= TEMPVAR
-RESULTL	= TEMPVAR+1
-RESULTR	= TEMPVAR+2
-RESULTD	= TEMPVAR+3
-chkseam	sec			;uint1_t chkseam(register uint8_t& a,
+chkseam	sec			;uint2_t chkseam(register uint8_t& a,
 	lda	POINTR2		;                register uint8_t y) {
 	sbc	#FDIM		; int8_t RESULTU, RESULTL, RESULTR, RESULTD; 
-	sta	POINTER		;
+	sta	POINTER		; uint1_t z, c;
 	lda	1+POINTR2	;
 	sbc	#0		;
 	sta	1+POINTER	;
 	jsr	pntr2up		; POINTER = POINTR2-FDIM; // candidate top seam
 	sta	RESULTU		; RESULTU = pntr2up();
-	bmi	illseam		; if (RESULTU < 0) return 0x80; // z set
+	cmp	#$80		; if (RESULTU == 0x80)
+	beq	illseam		;  goto illseam; // conflict with cell above
 
 	sec			;
 	lda	POINTR2		; 
@@ -1381,10 +1382,11 @@ chkseam	sec			;uint1_t chkseam(register uint8_t& a,
 ;	sta	1+POINTER	;
 	jsr	pntr2lt		; POINTER = POINTR2-1; // candidate left seam
 	sta	RESULTL		; RESULTL = pntr2lt();
-	bmi	illseam		; if (RESULTL < 0) return 0x80; // z set
-	
-	inc	POINTR2		;
-	inc	POINTR2		;
+	cmp	#$80		; if (RESULTL == 0x80)
+	beq	illseam		;  goto illseam; // conflict with cell to left
+
+	inc	POINTER		;
+	inc	POINTER		;
 ;	clc			;
 ;	lda	POINTR2		;
 ;	adc	#1		;
@@ -1393,9 +1395,10 @@ chkseam	sec			;uint1_t chkseam(register uint8_t& a,
 ;	adc	#0		;
 ;	sta	1+POINTER	;
 	jsr	pntr2rt		; POINTER = POINTR2+1; // candidate right seam
-	bmi	illseam		; if (RESULTR < 0) return 0x80; // z set
+	cmp	#$80		; if (RESULTR == 0x80)
+	beq	illseam		;  goto illseam; // confict with cell to right
 	sta	RESULTR		; RESULTR = pntr2rt();
-	
+
 	clc			;
 	lda	POINTR2		;
 	adc	#FDIM		;
@@ -1404,25 +1407,29 @@ chkseam	sec			;uint1_t chkseam(register uint8_t& a,
 	adc	#0		;
 	sta	1+POINTER	;
 	jsr	pntr2dn		; POINTER = POINTR2+FDIM; // candidate bot seam
-	bmi	illseam		; if (RESULTD < 0) return 0x80; // z set
+	cmp	#$80		; if (RESULTD == 0x80)
+	beq	illseam		;  goto illseam; // conflict with cell below
 	sta	RESULTD		; RESULTD = pntr2dn();
+
 	ora	RESULTR		;
 	ora	RESULTL		;
 	ora	RESULTU		;
-	php			; uint1_t z = RESULTU|RESULTL|RESULTR|RESULTD;
 	clc			;
+	php			; // z = 1 if all (not the sum) are zero
 	lda	RESULTD		;
+	adc	RESULTR		;
 	adc	RESULTL		;
-	adc	RESULTU		;
-	plp			; // z will be set if all (not the sum) are zero
-	rts			; return RESULTU + RESULTL + RESULTR + RESULTU;
+	adc	RESULTU		; a = RESULTU + RESULTL + RESULTR + RESULTU;
+	plp			; z = (RESULTU|RESULTL|RESULTR|RESULTD) == 0;
+	rts			; return z, c = 0;
 illseam
-	lda	#$80		; // A=0, Z=1 if adjacent sides of seam mismatch
+	sec			; illseam: return z = 0, c = 1; // a = 0x80
 +
  .endif
 	rts			;} // chkseam()
 .endif
 
+ZFLGMSK	= 1
 stampit	lda	CURTILE		;uint8_t stampit(uint8_t a) {
 	beq	nostamp		; if ((CURTILE[0] = a) != 0) { // tile not blank
 	tofield	0		;
@@ -1435,16 +1442,27 @@ stampit	lda	CURTILE		;uint8_t stampit(uint8_t a) {
 .if VIC20NO
 	pha			;    uint8_t stack1 = x; // after outer pattern
 	jsr	chkseam		;    uint8_t a;
-	beq	nostam2		;    if (chkseam(&a, y)) { // delta conns in a
+	bcs	nostam2		;    if (chkseam(&a, y)) { // delta conns in a
+	php			;
+	pla			;     // discarding a, only checking for c and z
+	and	#ZFLGMSK	;
+	sta	OVERBRD		;     OVERBRD = z; // if z this time, can't next
 
-	tya			;     // outer square of tile passed check
+	tya			;     // outer square of tile tentatively passes
 	pha			;     uint8_t stack2 = y; // save outer location
+
 	ldy	#FDIM		;     y = FDIM;
-	jsr	chkseam		;     if (chkseam(&a, y)) { // delta conns in a
-	beq	nostam3		;      // inner square of tile passed check too
+	jsr	chkseam		;     if (chkseam(&a, y)  // delta conns in a
+	bcs	nostam3		;         &&
+	sta	TEMPVAR		;
+	php			;
+	pla			;
+	and	OVERBRD		;
+	bne	nostam3		;         ((z & OVERBRD) == 0)) { // not z twice
 
 	clc			;
-	adc	UNRSLVD		;
+	lda	TEMPVAR		;
+	adc	UNRSLVD		;      // inner square of tile passed check too
 	sta	UNRSLVD		;      UNRSLVD += a; // a<0 closing in,>0 losing
 	pla			;
 	tay			;      y = stack2; // outer location back in y
@@ -1455,7 +1473,8 @@ stampit	lda	CURTILE		;uint8_t stampit(uint8_t a) {
 	ldy	#FDIM		;
 .if VIC20NO
 	jsr	chkseam		;      UNRSLVD(&a, y); // better still pass
-	bne	+		;      // a failure here likely means that the
+	b	+		;      // a failure here likely means that the
+
 	brk			;      // tile used the wrong innsyma/outsyma?
 +	clc			;
 	adc	UNRSLVD		;
