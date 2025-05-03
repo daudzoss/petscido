@@ -583,17 +583,18 @@ loop7
 	cmp	#$00		;
 	beq	-		;    while ((a = getchar()) { // keyboard loop
 	cmp	#'1'		;
-	beq	+		;
+	beq	++		;
 	cmp	#'2'		;
-	beq	+		;
+	beq	++		;
 	cmp	#'3'		;
-	beq	+		;     if (a == 0x31 || a == 0x32 || a == 0x33 ||
+	beq	++		;     if (a == 0x31 || a == 0x32 || a == 0x33 ||
 	cmp	#$85		;
 	beq	+		;
 	cmp	#$86		;
 	beq	+		;
 	cmp	#$87		;             /*F1*/       /*F3*/       /*F5*/
-	bne	+++		;         a == 0x85 || a == 0x86 || a == 0x87) {
+	bne	++++		;         a == 0x85 || a == 0x86 || a == 0x87) {
++	jsr	touchup		;
 +	and	#$03		;
 	tay			;
 	lda	CURTILE		;
@@ -726,6 +727,7 @@ loop7
 	beq	+		;                    /*F7*/
 	cmp	#$88		;                a == 0x88) {
 	bne	++		;
+	jsr	touchup		;
 +	jmp	loop2		;      break; // rotate cw through all 4 options
 
 +	cmp	#$0d		;
@@ -829,28 +831,6 @@ qprompt
 
 	cpy	#'y' & $df	;   } // next rotation
 	beq	+		;  } // next position
-
-;;	beq	+		;  } // next position
-; beq	+++
-; tya	
-; lsr
-; lsr
-; lsr
-; lsr
-; ora #'0' 
-; cmp #'9'+1
-; bcc +
-; sec
-; sbc #'9'
-;+ sta SCREENM
-; tya	
-; and #$0f
-; ora #'0' 
-; cmp #'9'+1
-; bcc +
-; sec
-; sbc #'9'
-;+ sta SCREENM+1
 	jmp	loop7		; } // next tile
 ;+	rts			;} // main()
 reveal	ldx	#3		;void reveal(void) {
@@ -871,6 +851,16 @@ reveal	ldx	#3		;void reveal(void) {
 	bne	-		; }
 +	rts			;} // reveal()
 
+touchup	ldy	#$06		;
+	sty	SCREENM+$0a	;
+	sty	SCREENM+$0f	;
+	sty	SCREENM+$14	;
+	ldy	#$33		;
+	sty	SCREENM+$10	;
+	ldy	#$35		;
+	sty	SCREENM+$15	;
+	rts			;
+	
 liftile	lda	PBACKUP		;void liftile(void) {
 	sta	SCREENM+XHAIRPV	; SCREENM[XHAIRPV] = PBACKUP;
 	lda	LBACKUP		;
