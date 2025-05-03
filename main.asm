@@ -1377,25 +1377,24 @@ algnedg	.macro	new,old		;inline int8_t algnedg(uint4_t new,uint4_t old){
 	beq	++		;    return 0; // or we don't so OK but change=0
 +	lda	(POINTR2),y	;  }
 	and	#\new		; } else { // empty so either unresolved further
-	beq	+		;  return POINTR2[y] & new ? 1 : 0; // or unconn
+	beq	+		;  return (POINTR2[y]&new) ? 1 : 0; // or unconn
 	lda	#1		; }
 +	
 	.endm			;} // algnedg()
 	
-pntr2up	algnedg	1<<3,1<<1	;void pntr2up(void) {}
-pntr2lt	algnedg	1<<2,1<<0	;void pntr2lt(void) {}
-pntr2rt algnedg	1<<0,1<<2	;void pntr2rt(void) {}
-pntr2dn algnedg	1<<1,1<<3	;void pntr2dn(void) {}
-
  .if 1
 chkseam	lda	#0		;uint1_t chkseam(register uint8_t& a, register
 	clc			;  uint8_t y) { a=0; return c=0,z=0; // trivial
 	cmp	#$ff		;} // chkseam()
  .else
-pntr2up
-pntr2lt
-pntr2rt
-pntr2dn
+pntr2up	algnedg	1<<3,1<<1	;int8_t pntr2up(void) { return algnedg(8,2);
+	rts			;}
+pntr2lt	algnedg	1<<2,1<<0	;int8_t pntr2lt(void) { return algnedg(4,1);
+	rts			;}
+pntr2rt algnedg	1<<0,1<<2	;int8_t pntr2rt(void) { return algnedg(1,4);
+	rts			;}
+pntr2dn algnedg	1<<1,1<<3	;int8_t pntr2dn(void) { return algnedg(2,8);
+	rts			;}
 
 chkseam	sec			;uint2_t chkseam(register uint8_t& a,
 	lda	POINTR2		;                register uint8_t y) {
@@ -1431,9 +1430,9 @@ chkseam	sec			;uint2_t chkseam(register uint8_t& a,
 ;	adc	#0		;
 ;	sta	1+POINTER	;
 	jsr	pntr2rt		; POINTER = POINTR2+1; // candidate right seam
+	sta	RESULTR		; RESULTR = pntr2rt();
 	cmp	#$80		; if (RESULTR == 0x80)
 	beq	illseam		;  goto illseam; // confict with cell to right
-	sta	RESULTR		; RESULTR = pntr2rt();
 
 	clc			;
 	lda	POINTR2		;
@@ -1443,9 +1442,9 @@ chkseam	sec			;uint2_t chkseam(register uint8_t& a,
 	adc	#0		;
 	sta	1+POINTER	;
 	jsr	pntr2dn		; POINTER = POINTR2+FDIM; // candidate bot seam
+	sta	RESULTD		; RESULTD = pntr2dn();
 	cmp	#$80		; if (RESULTD == 0x80)
 	beq	illseam		;  goto illseam; // conflict with cell below
-	sta	RESULTD		; RESULTD = pntr2dn();
 
 	ora	RESULTR		;
 	ora	RESULTL		;
@@ -1455,9 +1454,9 @@ chkseam	sec			;uint2_t chkseam(register uint8_t& a,
 	lda	RESULTD		;
 	adc	RESULTR		;
 	adc	RESULTL		;
-	adc	RESULTU		; a = RESULTU + RESULTL + RESULTR + RESULTU;
+	adc	RESULTU		; a = RESULTU + RESULTL + RESULTR + RESULTD;
 	plp			; z = (RESULTU|RESULTL|RESULTR|RESULTD) == 0;
-	rts			; return z, c = 0;
+	rts			; return z, c = 0; // as in "c == conflicting"
 illseam
 	sec			; illseam: return z = 0, c = 1; // a = 0x80
 +
