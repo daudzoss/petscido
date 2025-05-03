@@ -1354,7 +1354,8 @@ pntr2dn
 
  .if 1
 chkseam	lda	#0		;uint1_t chkseam(register uint8_t& a, register
-	cmp	#$ff		;  uint8_t y) { a=0; return z=0; // trivial pass
+	clc			;  uint8_t y) { a=0; return c=0,z=0; // trivial
+	cmp	#$ff		;} // chkseam()
  .else
 pntr2up
 pntr2lt
@@ -1431,8 +1432,9 @@ illseam
 
 ZFLGMSK	= 1<<1
 stampit	lda	CURTILE		;uint8_t stampit(uint8_t a) {
-	beq	nostamp		; if ((CURTILE[0] = a) != 0) { // tile not blank
-	tofield	0		;
+	bne	+		;
+	jmp	nostamp		; if ((CURTILE[0] = a) != 0) { // tile not blank
++	tofield	0		;
 	bne	nostamp		;  if (tofield(0 /*inner*/, a, &x, &y) == 0) {
 	txa			;
 	pha			;   uint8_t stack = x; // inner pattern to stamp
@@ -1473,7 +1475,7 @@ stampit	lda	CURTILE		;uint8_t stampit(uint8_t a) {
 	ldy	#FDIM		;
 .if VIC20NO
 	jsr	chkseam		;      UNRSLVD(&a, y); // better still pass
-	b	+		;      // a failure here likely means that the
+	bcc	+		;      // a failure here likely means that the
 
 	brk			;      // tile used the wrong innsyma/outsyma?
 +	clc			;
