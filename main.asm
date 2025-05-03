@@ -136,7 +136,7 @@ XHAIRC	.byte	$62		; static uint8_t XHAIRC = 0x62; // bright orange
 ;;;    2^3
 ;;; 2^2   2^0
 ;;;    2^1
-;;; upper 4 msb are masked off once that entry/exit connects to adjacent symbol
+;;; upper 4 msb are masked off once that entry/exit connects to adjacent symbol?
 	torch = $51
 symchar	.text	$20		; 0: space, unoccupied spot in play area
 	.text	$80|torch	; 1: circle dead end, closes off escape
@@ -569,9 +569,13 @@ loop6	and	#$0f		;    case 0: default: // unrotated (rightward)
 
 loop7
 .if BKGRNDC
-	lda	#NOTDIRT	;
-	cmp	BKGRNDC		;
+	lda	BKGRNDC		;
+	and	#$0f		;
+	cmp	#NOTDIRT	;
 	beq	+		;
+	lda	BKGRNDC		;
+	and	#$f0		;
+	ora	#NOTDIRT	;
 	sta	BKGRNDC		;
 +
 .endif
@@ -652,6 +656,7 @@ loop7
 	bne	+		;
 	jsr	liftile		;      liftile();
  	jsr	inright		;      inright();
+	jmp	loop1		;
 +	cmp	#'s'		;     } else if (a == 0x53) {
 	bne	+		;
 	jsr	liftile		;      liftile();
@@ -705,11 +710,11 @@ loop7
 
 +	cmp	#$80		;     } else if (a == $a0 & 0xdf) { // ccw rot'n
 
-+
-.endif
-	cmp	#'b'		;     } else if (a == 0x41) { // bgnd/border clr
++	cmp	#'b'		;     } else if (a == 0x41) { // bgnd/border clr
 	bne	+		;
 	brk			;      return; // user break (for now)
++
+.endif
 
 +	cmp	#0		;     } else if (a == ' ' & 0xdf) {
 	bne	+		;
@@ -720,7 +725,9 @@ loop7
 	jsr	stampit		;
 	bne	+		;      if (stampit() == 0) { // copy tile to field
 .if BKGRNDC
-	lda	#DIRTCLR	;       if (BKGRNDC) {
+	lda	BKGRNDC		;
+	and	#$f0		;
+	ora	#DIRTCLR	;       if (BKGRNDC) {
 	sta	BKGRNDC		;        *BKGRNDC = DIRTCLR;//flashed
 	lda	#$40		;
 	tay			;
@@ -789,7 +796,9 @@ qprompt
 	pha			;
 	lda	SCREENM		;
 	pha			;
-	lda	#DIRTCLR	;
+	lda	BKGRNDC		;
+	and	#$f0		;
+	ora	#DIRTCLR	;
 	sta	BKGRNDC		;
 	lda	#$11		;      printf("%cQ?", 0x13 /* HOME */);
 	sta	SCREENM		;      if (getchar() & 0xdf != 'y')      
@@ -800,7 +809,9 @@ qprompt
 	beq	-		;       return;
 	and	#$df		;     }
 	tay			;
-	lda	#NOTDIRT	;
+	lda	BKGRNDC		;
+	and	#$f0		;
+	ora	#NOTDIRT	;
 	sta	BKGRNDC		;
 	pla			;
 	sta	SCREENM		;
@@ -1347,10 +1358,36 @@ tofield	.macro			;inline uint8_t tofield(uint1_t out,
 	.endm			;}
 
 .if VIC20NO
-pntr2rt
-pntr2lt
-pntr2up
-pntr2dn
+algnedg	.macro	new,old		;inline int8_t algnedg(uint4_t new,uint4_t old){
+	lda	(POINTER),y	; uint8_t a = POINTER[y]; // grab bordering cell
+	beq	++++		; if (a) { // not blank, is a potential neighbor
+	and	#\old		;
+	beq	++		;  if (a & old) { // neighbor wants a connection
+	lda	(POINTR2),y	;   a = POINTR2[y];
+	and	#\new		;
+	beq	+		;   if (a & new) // and we have one to supply,
+	lda	#$ff		;
+	bne	+++++		;    return -1; // thus decrease unresolved by 1
++	lda	#$80		;   else
+	bne	++++		;    return -128; // or we don't so incompatible
++	lda	(POINTR2),y	;  } else { // neighbor has no connection for us
+	and	#\new		;   a = POINTR2[y];
+	bne	+		;   if (a & new) // but we have one to supply
+	lda	#$80		;
+	bne	+++		;    return -128; // thus incompatible
++	lda	#0		;   else
+	beq	++		;    return 0; // or we don't so OK but change=0
++	lda	(POINTR2),y	;  }
+	and	#\new		; } else { // empty so either unresolved further
+	beq	+		;  return POINTR2[y] & new ? 1 : 0; // or unconn
+	lda	#1		; }
++	
+	.endm			;} // algnedg()
+	
+pntr2up	algnedg	1<<3,1<<1	;void pntr2up(void) {}
+pntr2lt	algnedg	1<<2,1<<0	;void pntr2lt(void) {}
+pntr2rt algnedg	1<<0,1<<2	;void pntr2rt(void) {}
+pntr2dn algnedg	1<<1,1<<3	;void pntr2dn(void) {}
 
  .if 1
 chkseam	lda	#0		;uint1_t chkseam(register uint8_t& a, register

@@ -1,6 +1,6 @@
 ZP	= $76
 BASIC	= $1000
-BKGRNDC	= 0
+BKGRNDC	= $ff15
 RNDLOC1	= $ff1d
 RNDLOC2	= $ff1e
 SCREENW = $28
