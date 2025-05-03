@@ -587,7 +587,13 @@ loop7
 	cmp	#'2'		;
 	beq	+		;
 	cmp	#'3'		;
-	bne	+++		;     if (a == 0x31 || a == 0x32 || a == 0x33) {
+	beq	+		;     if (a == 0x31 || a == 0x32 || a == 0x33 ||
+	cmp	#$85		;
+	beq	+		;
+	cmp	#$86		;
+	beq	+		;
+	cmp	#$87		;             /*F1*/       /*F3*/       /*F7*/
+	bne	+++		;         a == 0x85 || a == 0x86 || a == 0x87) {
 +	and	#$03		;
 	tay			;
 	lda	CURTILE		;
