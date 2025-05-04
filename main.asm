@@ -1457,8 +1457,8 @@ chkseam	sec			;uint2_t chkseam(register uint8_t& a,
 	adc	RESULTL		;
 	adc	RESULTU		; a = RESULTU + RESULTL + RESULTR + RESULTD;
 	plp			; z = (RESULTU|RESULTL|RESULTR|RESULTD) == 0;
- brk
- nop
+; brk
+; nop
 	rts			; return z, c = 0; // as in "c == conflicting"
 illseam
 	sec			; illseam: return z = 0, c = 1; // a = 0x80
