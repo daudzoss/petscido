@@ -1383,7 +1383,7 @@ algnedg	.macro	new,old		;inline int8_t algnedg(uint4_t new,uint4_t old){
 +	
 	.endm			;} // algnedg()
 	
- .if 1
+ .if 0
 chkseam	lda	#0		;uint1_t chkseam(register uint8_t& a,
 	clc			;                register uint8_t y) {
 	cmp	#$ff		; a=0; return c=0,z=0; // trivial
@@ -1460,7 +1460,6 @@ chkseam	sec			;uint2_t chkseam(register uint8_t& a,
 	rts			; return z, c = 0; // as in "c == conflicting"
 illseam
 	sec			; illseam: return z = 0, c = 1; // a = 0x80
-+
  .endif
 	rts			;} // chkseam()
 .endif
@@ -1485,14 +1484,21 @@ stampit	lda	CURTILE		;uint8_t stampit(void) {
 	sta	(POINTR2),y	;    POINTR2[y] = a; // tentatively place inner
 .if VIC20NO
 	jsr	chkseam		;
-	bcs	nostam2		;    if (chkseam(&a, y)) { // delta conns in a
+; brk
+; nop
+	bcs	nostam0		;    if (chkseam(&a, y)) { // delta conns in a
+	sta	TEMPVAR		;     TEMPVAR = a;
 	php			;     // +FDIM inner square of tile passed check
 	pla			;
-	and	#1<<1;ZFLAGMASK	;     // discarding a, only checking for c and z
+	and	#1<<1;ZFLAGMASK	;
 	sta	OVERBRD		;     OVERBRD = z; // if z this time, can't next
+	lda	TEMPVAR		;
+	pha			;     stack = TEMPVAR; // first chkseam() retval
 	ldy	STASHTY		;     y = STASHTY;
-	jsr	chkseam		;     if (chkseam(&a, y) && // delta conns in a
-	bcs	nostam2		;
+	jsr	chkseam		;
+; brk
+; nop
+	bcs	nostam2		;     if (chkseam(&a, y) && // delta conns in a
 	sta	TEMPVAR		;
 	php			;
 	pla			;
@@ -1503,17 +1509,16 @@ stampit	lda	CURTILE		;uint8_t stampit(void) {
 	adc	UNRSLVD		;      // outer square of tile passed check too
 	sta	UNRSLVD		;      UNRSLVD += a; // a<0 closing in,>0 losing
 	ldy	#FDIM		;
-	jsr	chkseam		;      chkseam(&a, y); // better still pass
-	bcc	+		;      // a failure here likely means that the
-	brk			;      // tile used the wrong innsyma/outsyma?
-;	clc			;
-+	adc	UNRSLVD		;
+	pla			;      a = stack; // first chkseam() retval
+	clc			;
+	adc	UNRSLVD		;
 	sta	UNRSLVD		;      UNRSLVD += a; // a<0 closing in,>0 losing
 .endif
 	lda	CURTILE		;
 	rts			;      return CURTILE[0];
 .if VIC20NO
-nostam2	lda	#0		;     }
+nostam2	pla			;
+nostam0	lda	#0		;     }
 	ldy	#FDIM		;    } else { // both tiles didn't check out OK
 	sta	(POINTR2),y	;     POINTR2[FDIM] = POINTR2[y=STASHTY] = 0;
 	ldy	STASHTY		;    } // by here, field unchanged due to error
