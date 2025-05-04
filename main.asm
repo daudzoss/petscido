@@ -1373,7 +1373,7 @@ algnedg	.macro	new,old		;inline int8_t algnedg(uint4_t new,uint4_t old){
 	bne	++++		;    return -128; // or we don't so incompatible
 +	lda	(POINTR2),y	;  } else { // neighbor has no connection for us
 	and	#\new		;   a = POINTR2[y];
-	bne	+		;   if (a & new) // but we have one to supply
+	beq	+		;   if (a & new) // but we have one to supply
 	lda	#$80		;
 	bne	+++		;    return -128; // thus incompatible
 +	lda	#0		;   else
@@ -1400,6 +1400,8 @@ pntr2dn algnedg	1<<1,1<<3	;int8_t pntr2dn(void) { return algnedg(2,8);
 	rts			;}
 
 chkseam	sec			;uint2_t chkseam(register uint8_t& a,
+; lda #1
+; sta illseam+1
 	lda	POINTR2		;                register uint8_t y) {
 	sbc	#FDIM		; int8_t RESULTU, RESULTL, RESULTR, RESULTD; 
 	sta	POINTER		; uint1_t z, c;
@@ -1411,6 +1413,7 @@ chkseam	sec			;uint2_t chkseam(register uint8_t& a,
 	cmp	#$80		; if (RESULTU == 0x80)
 	beq	illseam		;  goto illseam; // conflict with cell above
 
+; inc illseam+1
 	sec			;
 	lda	POINTR2		; 
 	sbc	#1		;
@@ -1423,6 +1426,7 @@ chkseam	sec			;uint2_t chkseam(register uint8_t& a,
 	cmp	#$80		; if (RESULTL == 0x80)
 	beq	illseam		;  goto illseam; // conflict with cell to left
 
+; inc illseam+1
 	inc	POINTER		;
 	inc	POINTER		;
 	jsr	pntr2rt		; POINTER = POINTR2+1; // candidate right seam
@@ -1430,6 +1434,7 @@ chkseam	sec			;uint2_t chkseam(register uint8_t& a,
 	cmp	#$80		; if (RESULTR == 0x80)
 	beq	illseam		;  goto illseam; // confict with cell to right
 
+; inc illseam+1
 	clc			;
 	lda	POINTR2		;
 	adc	#FDIM		;
@@ -1452,20 +1457,27 @@ chkseam	sec			;uint2_t chkseam(register uint8_t& a,
 	adc	RESULTL		;
 	adc	RESULTU		; a = RESULTU + RESULTL + RESULTR + RESULTD;
 	plp			; z = (RESULTU|RESULTL|RESULTR|RESULTD) == 0;
-; brk
-; nop
 	rts			; return c = 0, z, n; // as in "c == conflict"
 illseam
+; brk
+; nop
 	sec			; illseam: return c = 1, z = 0, n = 1; // a = 0
  .endif
 	rts			;} // chkseam()
 .endif
 
-stampit	lda	CURTILE		;uint8_t stampit(void) {
+stampit
+	lda	CURTILE		;uint8_t stampit(void) {
 	bne	+		; register uint8_t a, x, y;
 	rts			; if (CURTILE[0]) { // tile not blank
 +	tofield	0		;
+.if VIC20NO
+	beq	+
+	jmp	nostamp
++
+.else
 	bne	nostamp		;  if (tofield(0 /*inner*/, a, &x, &y) == 0) {
+.endif
 	stx	ISTAMPT		;   ISTAMPT = x;
 	tofield	1		;
 	bne	nostamp		;   if (tofield(1 /*outer*/, a, &x, &y) == 0) {
@@ -1494,8 +1506,6 @@ stampit	lda	CURTILE		;uint8_t stampit(void) {
 	pla			;
 	and	#1<<7;NFLAGMASK	;
 	ora	OVERBRD		;
-; brk
-; nop	
 	beq	reblank		;         (n & OVERBRD)) { // at least one conn
 
 	;clc			;
