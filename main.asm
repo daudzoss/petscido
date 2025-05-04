@@ -1489,8 +1489,8 @@ stampit	lda	CURTILE		;uint8_t stampit(void) {
 .if VIC20NO
 	jsr	chkseam		;
 	bcs	reblank		;     if (chkseam(&a, y) && // delta conns in a
-	sta	TEMPVAR		;
 	php			;
+	sta	TEMPVAR		;
 	pla			;
 	and	#1<<7;NFLAGMASK	;
 	ora	OVERBRD		;
@@ -1499,6 +1499,7 @@ stampit	lda	CURTILE		;uint8_t stampit(void) {
 	bne	reblank		;         (n & OVERBRD)) { // at least one conn
 
 	;clc			;
+	lda	TEMPVAR		;
 	adc	UNRSLVD		;      // inner is now permanently placed so we
 	sta	UNRSLVD		;      UNRSLVD += a; // adjust the unresolved #
 	ldy	STASHTY		;
