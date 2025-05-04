@@ -1496,7 +1496,7 @@ stampit	lda	CURTILE		;uint8_t stampit(void) {
 	ora	OVERBRD		;
 ; brk
 ; nop	
-	bne	reblank		;         (n & OVERBRD)) { // at least one conn
+	beq	reblank		;         (n & OVERBRD)) { // at least one conn
 
 	;clc			;
 	lda	TEMPVAR		;
