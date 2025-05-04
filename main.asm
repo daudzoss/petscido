@@ -111,13 +111,15 @@ DBACKUP	= vararea+$09 		; static uint8_t DBACKUP;
 XFLDOFS	= vararea+$0a 		; static uint8_t XFLDOFS; // horizontal
 YFLDOFS	= vararea+$0b 		; static uint8_t YFLDOFS; // vertical
 DECKREM	= vararea+$0c 		; static uint8_t DECKREM;
-OVERBRD	= vararea+$0d		; static int8_t OVERBRD;
-TEMPVAR	= vararea+$0e		; static int8_t TEMPVAR;
+TEMPVAR	= vararea+$0d		; static int8_t TEMPVAR;
+OVERBRD	= vararea+$0e		; static int8_t OVERBRD;
 STASHTY	= vararea+$0f		; static int8_t STASHTY;
-RESULTU	= vararea+$10		; static int8_t RESULTU;
-RESULTL	= vararea+$11		; static int8_t RESULTL;
-RESULTR	= vararea+$12		; static int8_t RESULTR;
-RESULTD	= vararea+$13		; static int8_t RESULTD;
+RESULTR	= vararea+$10		; static int8_t RESULTR;
+RESULTD	= vararea+$11		; static int8_t RESULTD;
+RESULTL	= vararea+$12		; static int8_t RESULTL;
+RESULTU	= vararea+$13		; static int8_t RESULTU;
+ISTAMPT	= vararea+$14		; static uint8_t ISTAMPT;
+OSTAMPT	= vararea+$15		; static uint8_t OSTAMPT;
 
 ROTNOFS .byte	FDIM+1		; static const ROTNOFS[] = {FDIM+1, //R is 1D 1R
 	.byte 	FDIM*2		;                           FDIM*2, //D is 2D
@@ -1413,9 +1415,9 @@ chkseam	sec			;uint2_t chkseam(register uint8_t& a,
 	lda	POINTR2		; 
 	sbc	#1		;
 	sta	POINTER		;
-;	lda	1+POINTR2	;
-;	sbc	#0		;
-;	sta	1+POINTER	;
+	lda	1+POINTR2	;
+	sbc	#0		;
+	sta	1+POINTER	;
 	jsr	pntr2lt		; POINTER = POINTR2-1; // candidate left seam
 	sta	RESULTL		; RESULTL = pntr2lt();
 	cmp	#$80		; if (RESULTL == 0x80)
@@ -1423,13 +1425,6 @@ chkseam	sec			;uint2_t chkseam(register uint8_t& a,
 
 	inc	POINTER		;
 	inc	POINTER		;
-;	clc			;
-;	lda	POINTR2		;
-;	adc	#1		;
-;	sta	POINTER		;
-;	lda	1+POINTR2	;
-;	adc	#0		;
-;	sta	1+POINTER	;
 	jsr	pntr2rt		; POINTER = POINTR2+1; // candidate right seam
 	sta	RESULTR		; RESULTR = pntr2rt();
 	cmp	#$80		; if (RESULTR == 0x80)
@@ -1471,62 +1466,57 @@ stampit	lda	CURTILE		;uint8_t stampit(void) {
 	rts			; if (CURTILE[0]) { // tile not blank
 +	tofield	0		;
 	bne	nostamp		;  if (tofield(0 /*inner*/, a, &x, &y) == 0) {
-	txa			;
-	pha			;   uint8_t a, stack = x; // inner stamp pattern
+	stx	ISTAMPT		;   ISTAMPT = x;
 	tofield	1		;
-	bne	nostam1		;   if (tofield(1 /*outer*/, a, &x, &y) == 0) {
-	txa			;    // no tile(s) in this one's location yet
-	sta	(POINTR2),y	;    POINTR2[y] = x; // tentatively place outer
+	bne	nostamp		;   if (tofield(1 /*outer*/, a, &x, &y) == 0) {
+	stx	OSTAMPT		;    // no tile(s) in this one's location yet
+	txa			;    // so tentatively place outer half of tile
+	sta	(POINTR2),y	;    POINTR2[y] = OSTAMPT = x;
 .if VIC20NO
 	sty	STASHTY		;    STASHTY = y; // save outer location
-.endif
-	ldy	#FDIM		;    y = FDIM;
-	pla			;    a = stack;
-	sta	(POINTR2),y	;    POINTR2[y] = a; // tentatively place inner
-.if VIC20NO
 	jsr	chkseam		;
-; brk
-; nop
-	bcs	nostam0		;    if (chkseam(&a, y)) { // delta conns in a
-	sta	TEMPVAR		;     TEMPVAR = a;
+	bcs	reblank		;    if (chkseam(&a, y)) { // delta conns in a
 	php			;     // +FDIM inner square of tile passed check
 	pla			;
 	and	#1<<1;ZFLAGMASK	;
 	sta	OVERBRD		;     OVERBRD = z; // if z this time, can't next
-	lda	TEMPVAR		;
-	pha			;     stack = TEMPVAR; // first chkseam() retval
-	ldy	STASHTY		;     y = STASHTY;
+	lda	#0		;
+	sta	(POINTR2),y	;     POINTR2[y] = 0; // unplace outer half, and
+.endif
+	ldy	#FDIM		;
+	lda	ISTAMPT		;                     // tentatively place inner
+	sta	(POINTR2),y	;     POINTR2[y=FDIM] = ISTAMPT;
+.if VIC20NO
 	jsr	chkseam		;
-	bcs	nostam2		;     if (chkseam(&a, y) && // delta conns in a
+	bcs	reblank		;     if (chkseam(&a, y) && // delta conns in a
 	sta	TEMPVAR		;
-; brk
-; nop
 	php			;
 	pla			;
 	and	OVERBRD		;
-	bne	nostam2		;         ((z & OVERBRD) == 0)) { // not z twice
-	lda	TEMPVAR		;
-	clc			;
+	bne	reblank		;         ((z & OVERBRD) == 0)) { // not z twice
+
+	;clc			;
+	adc	UNRSLVD		;      // inner is now permanently placed so we
+	sta	UNRSLVD		;      UNRSLVD += a; // adjust the unresolved #
+	ldy	STASHTY		;
+	lda	OSTAMPT		;      // permanently place outer half of tile
+	sta	(POINTR2),y	;      POINTR2[y=STASHTY] = OSTAMPT;
+	jsr	chkseam		;      if (!chkseam(&a, y)) brk; // shouldn't be
+	bcc	+		;
+	brk			;
++	;clc			;
 	adc	UNRSLVD		;      // outer square of tile passed check too
 	sta	UNRSLVD		;      UNRSLVD += a; // a<0 closing in,>0 losing
-	ldy	#FDIM		;
-	pla			;      a = stack; // first chkseam() retval
-	clc			;
-	adc	UNRSLVD		;
-	sta	UNRSLVD		;      UNRSLVD += a; // a<0 closing in,>0 losing
 .endif
-	lda	CURTILE		;
-	rts			;      return CURTILE[0];
+	lda	CURTILE		;      return CURTILE[0];
+	rts			;     }
 .if VIC20NO
-nostam2	pla			;
-nostam0	lda	#0		;     }
-	ldy	#FDIM		;    } else { // both tiles didn't check out OK
-	sta	(POINTR2),y	;     POINTR2[FDIM] = POINTR2[y=STASHTY] = 0;
-	ldy	STASHTY		;    } // by here, field unchanged due to error
+reblank	lda	#0		;    } // both halves didn't pass chk so unplace
+	ldy	#FDIM		;    POINTR2[FDIM] = POINTR2[y=STASHTY] = 0;
 	sta	(POINTR2),y	;   }
-	pha			;  }
+	ldy	STASHTY		;  }
+	sta	(POINTR2),y	; }
 .endif
-nostam1	pla			; }
 nostamp	lda	#0		; return 0;
 	rts			;} // stampit()
 
