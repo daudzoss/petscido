@@ -1442,11 +1442,11 @@ chkseam	sec			;uint2_t chkseam(register uint8_t& a,
 	cmp	#$80		; if (RESULTD == 0x80)
 	beq	illseam		;  goto illseam; // conflict with cell below
 
-	ora	RESULTR		;
-	ora	RESULTL		;
-	ora	RESULTU		;
-	clc			;
-	php			; // z = 1 if all (not the sum) are zero
+	ora	RESULTR		; // z = 1 if all (not the sum) are zero
+	ora	RESULTL		;          // i.e. torch abutting or isolated
+	ora	RESULTU		; // n = 1 if any (not necc all) are negative
+	clc			;          // i.e. at least one connection made
+	php			;
 	lda	RESULTD		;
 	adc	RESULTR		;
 	adc	RESULTL		;
@@ -1454,9 +1454,9 @@ chkseam	sec			;uint2_t chkseam(register uint8_t& a,
 	plp			; z = (RESULTU|RESULTL|RESULTR|RESULTD) == 0;
 ; brk
 ; nop
-	rts			; return z, c = 0; // as in "c == conflicting"
+	rts			; return c = 0, z, n; // as in "c == conflict"
 illseam
-	sec			; illseam: return z = 0, c = 1; // a = 0x80
+	sec			; illseam: return c = 1, z = 0, n = 1; // a = 0
  .endif
 	rts			;} // chkseam()
 .endif
@@ -1478,8 +1478,8 @@ stampit	lda	CURTILE		;uint8_t stampit(void) {
 	bcs	reblank		;    if (chkseam(&a, y)) { // delta conns in a
 	php			;     // +FDIM inner square of tile passed check
 	pla			;
-	and	#1<<1;ZFLAGMASK	;
-	sta	OVERBRD		;     OVERBRD = z; // if z this time, can't next
+	and	#1<<7;NFLAGMASK	;
+	sta	OVERBRD		;     OVERBRD = n; // n must be true on >= call
 	lda	#0		;
 	sta	(POINTR2),y	;     POINTR2[y] = 0; // unplace outer half, and
 .endif
@@ -1492,8 +1492,11 @@ stampit	lda	CURTILE		;uint8_t stampit(void) {
 	sta	TEMPVAR		;
 	php			;
 	pla			;
-	and	OVERBRD		;
-	bne	reblank		;         ((z & OVERBRD) == 0)) { // not z twice
+	and	#1<<7;NFLAGMASK	;
+	ora	OVERBRD		;
+; brk
+; nop	
+	bne	reblank		;         (n & OVERBRD)) { // at least one conn
 
 	;clc			;
 	adc	UNRSLVD		;      // inner is now permanently placed so we
