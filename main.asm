@@ -140,14 +140,14 @@ XHAIRC	.byte	$62		; static uint8_t XHAIRC = 0x62; // bright orange
 ;;; upper 4 msb are masked off once that entry/exit connects to adjacent symbol?
 	torch = $51
 symchar	.text	$20		; 0: space, unoccupied spot in play area
-	.text	$80|torch	; 1: circle dead end, closes off escape
-	.text	$80|torch	; 2: circle dead end, closes off escape (n/a)
+	.text	$80|torch	; 1: circle dead end, closes off escape, from RT
+	.text	$80|torch	; 2: circle dead end, closes off escape, from DN
 	.text	$80|$55		; 3: right bending downward
-	.text	$80|torch	; 4: circle dead end, closes off escape (n/a)
+	.text	$80|torch	; 4: circle dead end, closes off escape, from LT
 	.text	$80|$40		; 5: right straight leftward
 	.text	$80|$49		; 6: down bending leftward
 	.text	$80|$72		; 7: right straight leftward teed downward
-	.text	$80|torch	; 8: circle dead end, closes off escape (n/a)
+	.text	$80|torch	; 8: circle dead end, closes off escape, from UP
 	.text	$80|$4a		; 9: right bending upward
 	.text	$80|$5d		; a=10: down straight upward
 	.text	$80|$6b		; b=11: down straight upward teed rightward
@@ -211,7 +211,7 @@ pstdeck
 ;;; upper 2 msb are used for (clockwise) rotation angle
 
 .if VIC20NO
-innsyma	.text	$1		; 0: 
+innsyma	.text	$1		; 0: no entries/exits in left half
 	.text	$5		; 1: enters from left, closed off
 	.text	$9		; 2: enters from top left, closed off
 	.text	$d		; 3: enters from left, deflected up, closed off
@@ -220,7 +220,7 @@ innsyma	.text	$1		; 0:
 	.text	$b		; 6: enters from top left, exits bottom left
 	.text	$f		; 7: enters all left sides, closed off
 
-outsyma	.text	1;,1,1,1,1,1,1,1; 000000-000111: no entries/exits in right half
+outsyma	.text	$4		; 000000-000111: no entries/exits in right half
 	.text	$c		; 001000-001111: upper right to left half
 	.text	$6		; 010000-010111: lower right to left half
 	.text	$e		; 011000-011111: upper+lower right to left half
@@ -861,7 +861,7 @@ touchup	ldy	#$06		;
 	ldy	#$35		;
 	sty	SCREENM+$15	;
 	rts			;
-	
+
 liftile	lda	PBACKUP		;void liftile(void) {
 	sta	SCREENM+XHAIRPV	; SCREENM[XHAIRPV] = PBACKUP;
 	lda	LBACKUP		;
@@ -1382,7 +1382,7 @@ algnedg	.macro	new,old		;inline int8_t algnedg(uint4_t new,uint4_t old){
 	lda	#1		; }
 +	
 	.endm			;} // algnedg()
-	
+
  .if 0
 chkseam	lda	#0		;uint1_t chkseam(register uint8_t& a,
 	clc			;                register uint8_t y) {
@@ -1457,13 +1457,14 @@ chkseam	sec			;uint2_t chkseam(register uint8_t& a,
 	adc	RESULTL		;
 	adc	RESULTU		; a = RESULTU + RESULTL + RESULTR + RESULTD;
 	plp			; z = (RESULTU|RESULTL|RESULTR|RESULTD) == 0;
+ brk
+ nop
 	rts			; return z, c = 0; // as in "c == conflicting"
 illseam
 	sec			; illseam: return z = 0, c = 1; // a = 0x80
  .endif
 	rts			;} // chkseam()
 .endif
-
 
 stampit	lda	CURTILE		;uint8_t stampit(void) {
 	bne	+		; register uint8_t a, x, y;
@@ -1496,10 +1497,10 @@ stampit	lda	CURTILE		;uint8_t stampit(void) {
 	pha			;     stack = TEMPVAR; // first chkseam() retval
 	ldy	STASHTY		;     y = STASHTY;
 	jsr	chkseam		;
-; brk
-; nop
 	bcs	nostam2		;     if (chkseam(&a, y) && // delta conns in a
 	sta	TEMPVAR		;
+; brk
+; nop
 	php			;
 	pla			;
 	and	OVERBRD		;
@@ -1591,7 +1592,7 @@ innsyma	= SCREENC-(cphimem-field)
 	.text	$f		; 7: enters all left sides, closed off
 
 outsyma	= innsyma + * - field
-	.text	1;,1,1,1,1,1,1,1; 000000-000111: no entries/exits in right half
+	.text	$4		; 000000-000111: no entries/exits in right half
 	.text	$c		; 001000-001111: upper right to left half
 	.text	$6		; 010000-010111: lower right to left half
 	.text	$e		; 011000-011111: upper+lower right to left half
