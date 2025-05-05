@@ -120,6 +120,8 @@ RESULTL	= vararea+$12		; static int8_t RESULTL;
 RESULTU	= vararea+$13		; static int8_t RESULTU;
 ISTAMPT	= vararea+$14		; static uint8_t ISTAMPT;
 OSTAMPT	= vararea+$15		; static uint8_t OSTAMPT;
+DELTRSL	= vararea+$16		; static int8_t DELTRSL;
+UNRSLVD	= vararea+$17		; static uint8_t UNRSLVD;
 
 ROTNOFS .byte	FDIM+1		; static const ROTNOFS[] = {FDIM+1, //R is 1D 1R
 	.byte 	FDIM*2		;                           FDIM*2, //D is 2D
@@ -128,10 +130,6 @@ TILESAT	.byte	0		;                           0};// shared with..
 TILE1AT	.byte	toplin1-topline	; static const TILESAT[] = {0, topline+10,
 TILE2AT	.byte	toplin2-topline	;                              topline+15,
 TILE3AT	.byte	toplin3-topline	;                              topline+20};
-
-.if VIC20NO
-UNRSLVD	.byte	$05		; static uint8_t UNRSLVD = 5; // INITILE's 5 1's
-.endif
 
 FIELDC	.byte	DIRTCLR		; static uint8_t FIELDC = DIRTCLR; // black
 XHAIRC	.byte	$62		; static uint8_t XHAIRC = 0x62; // bright orange
@@ -281,6 +279,7 @@ main
 	lda	#$0f		;// P500 has to start in bank 15
 	sta	$01		;static volatile int execute_bank = 15;
 .endif
+	cld
 	lda	#<SBR1U		;static int called=0;
 	sta	POINTER		;
 	lda	#>SBR1U		;void main(void) {
@@ -294,7 +293,10 @@ main
 	sta	SEEDLOC		;  *SEEDLOC = SEEDVAL;
 .endif
 calls1x
-.if !VIC20NO			;
+.if VIC20NO			;
+	lda	#$05		;
+	sta	UNRSLVD		; static uint8_t UNRSLVD = 5; // INITILE's 5 1's
+.else
 	jsr	cphimem		; if (!VIC20NO && !called) // move consts to VIC
 .endif				;  cphimem(); // will get overwritten with NOP's
 	ldx	#SCREENH-2	; for (uint8_t x = SCREENH-2; x; x--) {
@@ -721,8 +723,8 @@ loop7
 +	cmp	#$80		;     } else if (a == $a0 & 0xdf) { // ccw rot'n
 
 +	cmp	#'b'		;     } else if (a == 0x41) { // bgnd/border clr
-	bne	+		;
-	brk			;      return; // user break (for now)
+;	bne	+		;
+;	brk			;      return; // user break (for now)
 +
 .endif
 
@@ -751,7 +753,7 @@ loop7
 	bne	-		;        continue;
 .endif
 	jmp	loop7		;       }
-+
++	jsr	nocolor		;
 .if VIC20NO
 	lda	UNRSLVD		;       if (UNRESLVD)
 	beq	+		;        goto loop; // draw new tile and reveal
@@ -809,10 +811,12 @@ qprompt
 	pha			;
 	lda	SCREENM		;
 	pha			;
+.if BKGRNDC
 	lda	BKGRNDC		;
 	and	#$f0		;
 	ora	#DIRTCLR	;
 	sta	BKGRNDC		;
+.endif
 	lda	#$11		;      printf("%cQ?", 0x13 /* HOME */);
 	sta	SCREENM		;      if (getchar() & 0xdf != 'y')      
 	lda	#'?'		;
@@ -822,10 +826,12 @@ qprompt
 	beq	-		;       return;
 	and	#$df		;     }
 	tay			;
+.if BKGRNDC
 	lda	BKGRNDC		;
 	and	#$f0		;
 	ora	#NOTDIRT	;
 	sta	BKGRNDC		;
+.endif
 	pla			;
 	sta	SCREENM		;
 	pla			;
@@ -874,7 +880,7 @@ liftile	lda	PBACKUP		;void liftile(void) {
 	sta	SCREENM+XHAIRUP	; SCREENM[XHAIRUP] = UBACKUP;
 	lda	DBACKUP		;
 	sta	SCREENM+XHAIRDN	; SCREENM[XHAIRDN] = DBACKUP;
-	lda	FIELDC		; // could reduce code and redraw just the two obscured character positionss instead of all five (faster? slower?)
+nocolor	lda	FIELDC		; // could reduce code and redraw just the two obscured character positionss instead of all five (faster? slower?)
 	sta	SCREENC+XHAIRPV	; SCREENC[XHAIRPV] = FIELDC;
 	sta	SCREENC+XHAIRLT	; SCREENC[XHAIRLT] = FIELDC;
 	sta	SCREENC+XHAIRRT	; SCREENC[XHAIRRT] = FIELDC;
@@ -1491,7 +1497,7 @@ stampit
 	php			;     // +FDIM inner square of tile passed check
 	pla			;
 	and	#1<<7;NFLAGMASK	;
-	sta	OVERBRD		;     OVERBRD = n; // n must be true on >= call
+	sta	OVERBRD		;     OVERBRD = n; // n must be true on >=1 call
 	lda	#0		;
 	sta	(POINTR2),y	;     POINTR2[y] = 0; // unplace outer half, and
 .endif
@@ -1502,25 +1508,35 @@ stampit
 	jsr	chkseam		;
 	bcs	reblank		;     if (chkseam(&a, y) && // delta conns in a
 	php			;
-	sta	TEMPVAR		;
+;	sta	DELTRSL		;
+; ldx #4
+; jsr readout
 	pla			;
 	and	#1<<7;NFLAGMASK	;
 	ora	OVERBRD		;
 	beq	reblank		;         (n & OVERBRD)) { // at least one conn
 
-	;clc			;
-	lda	TEMPVAR		;
-	adc	UNRSLVD		;      // inner is now permanently placed so we
-	sta	UNRSLVD		;      UNRSLVD += a; // adjust the unresolved #
+	clc			;
+;	lda	DELTRSL		;
+;	adc	UNRSLVD		;      // inner is now permanently placed so we
+;	sta	UNRSLVD		;      UNRSLVD += a; // adjust the unresolved #
 	ldy	STASHTY		;
 	lda	OSTAMPT		;      // permanently place outer half of tile
 	sta	(POINTR2),y	;      POINTR2[y=STASHTY] = OSTAMPT;
 	jsr	chkseam		;      if (!chkseam(&a, y)) brk; // shouldn't be
 	bcc	+		;
 	brk			;
-+	;clc			;
-	adc	UNRSLVD		;      // outer square of tile passed check too
-	sta	UNRSLVD		;      UNRSLVD += a; // a<0 closing in,>0 losing
++
+;	sta	DELTRSL		;
+; ldx #5
+; jsr readout
+;	clc			;
+;	lda	DELTRSL		;
+;	adc	UNRSLVD		;      // outer square of tile passed check too
+;	sta	UNRSLVD		;      UNRSLVD += a; // a<0 closing in,>0 losing
+; lda UNRSLVD
+; ldx #$16
+; jsr thermom	
 .endif
 	lda	CURTILE		;      return CURTILE[0];
 	rts			;     }
@@ -1533,6 +1549,62 @@ reblank	lda	#0		;    } // both halves didn't pass chk so unplace
 .endif
 nostamp	lda	#0		; return 0;
 	rts			;} // stampit()
+
+.if VIC20NO
+dig3bit	.byte	$30		; 000  0
+	.byte	$31		; 001 +1
+	.byte	$32		; 010 +2
+	.byte	$33		; 011 +3
+	.byte	$b4		; 100 -4
+	.byte	$b3		; 101 -3
+	.byte	$b2		; 110 -2
+	.byte	$b1		; 111 -1
+readout	sta	TEMPVAR		;
+ .if 1
+	and	#$f8		;
+	beq	+		;
+	eor	#$f8		;
+	beq	+		;
+	brk			;
++	lda	TEMPVAR		;
+	stx	TEMPVAR		;
+	and	#$07		;
+	tax			;
+	lda	dig3bit,x	;
+	ldx	TEMPVAR		;
+	sta	SCREENM,x	;
+ .endif
+	rts			;
+	
+thermom	sta	TEMPVAR		;
+ .if 1
+	cmp	#0		;
+	beq	+		;
+	lda	#$b0		;
+	sta	therval+1	;
+-	clc			;
+	lda	#1		;
+	adc	therval+1	;
+	sta	therval+1	;
+	cmp	#1+$b9		;
+	bcc	therval		;
+	lda	#$b0		;
+	sta	therval+1	;
+therval	lda	#$a0		;
+	sta	SCREENM,x	;
+	inx			;
+	cpx	#SCREENW-2	;
+	bcs	++		;
+	dec	TEMPVAR		;
+	bne	-		;
++	lda	#$20		;
+-	sta	SCREENM,x	;
+	inx			;
+	cpx	#SCREENW-2	;
+	bcc	-		;
+ .endif
++	rts			;
+.endif
 
 numleft
 .if 0
