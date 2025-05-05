@@ -33,7 +33,11 @@ COPIED2	= $0400
 DECKSIZ	= pstdeck-deck
 	.word	(+), 2055
 	.text	$99,$22,$1f,$09	; PRINT " CHR(31) CHR$(9) // BLU,enable
-	.text	$8e,$08,$13;$93	; CHR$(142) CHR$(8) CHR$(19) // UPPER,disabl,clr
+	.text	$8e,$08,$13	; CHR$(142) CHR$(8) CHR$(19) // UPPER,disabl,clr
+.if VIC20NO
+	.text	$13		; second clr undoes windows on C16, C128....
+.endif
+	
 topline	.text	format("%2d", DECKSIZ)
 	.text	" left "
 toplin1	.text	"  =1 "
@@ -279,7 +283,6 @@ main
 	lda	#$0f		;// P500 has to start in bank 15
 	sta	$01		;static volatile int execute_bank = 15;
 .endif
-	cld
 	lda	#<SBR1U		;static int called=0;
 	sta	POINTER		;
 	lda	#>SBR1U		;void main(void) {
@@ -602,7 +605,7 @@ loop7
 +	jsr	touchup		;
 +	and	#$03		;
 	tay			;
-	lda	CURTILE		;
+-	lda	CURTILE		;
 	and	#$c0		;      // turn CURTILE[0] into just its rotation
 	sta	CURTILE		;      CURTILE[0] &= 0xc0; // undo if not valid
 	lda	CURTILE,y	;
@@ -614,6 +617,18 @@ loop7
 	sta	CURTILE		;      CURTILE[0] |= CURTILE[CURTNUM]; // w/rotn
 	clc			;
 	jmp	cyxhair		;      goto cyxhair;
+
++	cmp	#$5f		;     } else if ((a == 95) /* <- */ ||
+.if VIC20NO
+	beq	+		;
+	cmp	#$1b		;
+.endif
+	bne	++		;                (a == 27) /* Esc */) {
++	ldy	CURTNUM		;
+	dey			;      if (--y)
+	bne	-		;       goto -;
+	ldy	#3		;      y = 3;
+	bne	-		;      goto -;
 
 +	cmp	#$14
 	bne	++		;
