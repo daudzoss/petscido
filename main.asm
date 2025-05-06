@@ -1646,4 +1646,4 @@ cphimem	ldy	#cphimem-field	;void cphimem(void) {
 
 	.fill	SCREENW		; bandaid mitigates (POINTER),Y when 0<Y<SCREENW
 vararea
-	end
+.end
