@@ -1475,7 +1475,9 @@ chkseam	sec			;uint2_t chkseam(register uint8_t& a,
 	php			;
 	lda	RESULTD		;
 	adc	RESULTR		;
+	clc			;
 	adc	RESULTL		;
+	clc			;
 	adc	RESULTU		; a = RESULTU + RESULTL + RESULTR + RESULTD;
 	plp			; z = (RESULTU|RESULTL|RESULTR|RESULTD) == 0;
 	rts			; return c = 0, z, n; // as in "c == conflict"
@@ -1523,18 +1525,18 @@ stampit
 	jsr	chkseam		;
 	bcs	reblank		;     if (chkseam(&a, y) && // delta conns in a
 	php			;
-;	sta	DELTRSL		;
-; ldx #4
-; jsr readout
+	sta	DELTRSL		;
+ ldx #4
+ jsr readout
 	pla			;
 	and	#1<<7;NFLAGMASK	;
 	ora	OVERBRD		;
 	beq	reblank		;         (n & OVERBRD)) { // at least one conn
 
 	clc			;
-;	lda	DELTRSL		;
-;	adc	UNRSLVD		;      // inner is now permanently placed so we
-;	sta	UNRSLVD		;      UNRSLVD += a; // adjust the unresolved #
+	lda	DELTRSL		;
+	adc	UNRSLVD		;      // inner is now permanently placed so we
+	sta	UNRSLVD		;      UNRSLVD += a; // adjust the unresolved #
 	ldy	STASHTY		;
 	lda	OSTAMPT		;      // permanently place outer half of tile
 	sta	(POINTR2),y	;      POINTR2[y=STASHTY] = OSTAMPT;
@@ -1542,16 +1544,16 @@ stampit
 	bcc	+		;
 	brk			;
 +
-;	sta	DELTRSL		;
-; ldx #5
-; jsr readout
-;	clc			;
-;	lda	DELTRSL		;
-;	adc	UNRSLVD		;      // outer square of tile passed check too
-;	sta	UNRSLVD		;      UNRSLVD += a; // a<0 closing in,>0 losing
-; lda UNRSLVD
-; ldx #$16
-; jsr thermom	
+	sta	DELTRSL		;
+ ldx #5
+ jsr readout
+	clc			;
+	lda	DELTRSL		;
+	adc	UNRSLVD		;      // outer square of tile passed check too
+	sta	UNRSLVD		;      UNRSLVD += a; // a<0 closing in,>0 losing
+ lda UNRSLVD
+ ldx #$16
+ jsr thermom	
 .endif
 	lda	CURTILE		;      return CURTILE[0];
 	rts			;     }
