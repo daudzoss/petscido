@@ -37,7 +37,7 @@ DECKSIZ	= pstdeck-deck
 .if VIC20NO
 	.text	$13		; second clr undoes windows on C16, C128....
 .endif
-	
+
 topline	.text	format("%2d", DECKSIZ)
 	.text	" left "
 toplin1	.text	"  =1 "
@@ -1526,8 +1526,6 @@ stampit
 	bcs	reblank		;     if (chkseam(&a, y) && // delta conns in a
 	php			;
 	sta	DELTRSL		;
- ldx #4
- jsr readout
 	pla			;
 	and	#1<<7;NFLAGMASK	;
 	ora	OVERBRD		;
@@ -1545,15 +1543,10 @@ stampit
 	brk			;
 +
 	sta	DELTRSL		;
- ldx #5
- jsr readout
 	clc			;
 	lda	DELTRSL		;
 	adc	UNRSLVD		;      // outer square of tile passed check too
 	sta	UNRSLVD		;      UNRSLVD += a; // a<0 closing in,>0 losing
- lda UNRSLVD
- ldx #$16
- jsr thermom	
 .endif
 	lda	CURTILE		;      return CURTILE[0];
 	rts			;     }
@@ -1566,62 +1559,6 @@ reblank	lda	#0		;    } // both halves didn't pass chk so unplace
 .endif
 nostamp	lda	#0		; return 0;
 	rts			;} // stampit()
-
-.if VIC20NO
-dig3bit	.byte	$30		; 000  0
-	.byte	$31		; 001 +1
-	.byte	$32		; 010 +2
-	.byte	$33		; 011 +3
-	.byte	$b4		; 100 -4
-	.byte	$b3		; 101 -3
-	.byte	$b2		; 110 -2
-	.byte	$b1		; 111 -1
-readout	sta	TEMPVAR		;
- .if 1
-	and	#$f8		;
-	beq	+		;
-	eor	#$f8		;
-	beq	+		;
-	brk			;
-+	lda	TEMPVAR		;
-	stx	TEMPVAR		;
-	and	#$07		;
-	tax			;
-	lda	dig3bit,x	;
-	ldx	TEMPVAR		;
-	sta	SCREENM,x	;
- .endif
-	rts			;
-	
-thermom	sta	TEMPVAR		;
- .if 1
-	cmp	#0		;
-	beq	+		;
-	lda	#$b0		;
-	sta	therval+1	;
--	clc			;
-	lda	#1		;
-	adc	therval+1	;
-	sta	therval+1	;
-	cmp	#1+$b9		;
-	bcc	therval		;
-	lda	#$b0		;
-	sta	therval+1	;
-therval	lda	#$a0		;
-	sta	SCREENM,x	;
-	inx			;
-	cpx	#SCREENW-2	;
-	bcs	++		;
-	dec	TEMPVAR		;
-	bne	-		;
-+	lda	#$20		;
--	sta	SCREENM,x	;
-	inx			;
-	cpx	#SCREENW-2	;
-	bcc	-		;
- .endif
-+	rts			;
-.endif
 
 numleft
 .if 0
@@ -1709,3 +1646,4 @@ cphimem	ldy	#cphimem-field	;void cphimem(void) {
 
 	.fill	SCREENW		; bandaid mitigates (POINTER),Y when 0<Y<SCREENW
 vararea
+	end
